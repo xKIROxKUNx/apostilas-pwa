@@ -1,0 +1,11 @@
+[
+  {
+    "origin": [
+      "https://xkiroxkunx.github.io",
+      "http://localhost:5173"
+    ],
+    "method": ["GET", "HEAD"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Content-Range", "Content-Length"]
+  }
+]

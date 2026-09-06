@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userLevel() {
+      return isSignedIn() && 'nivel' in request.auth.token
+        ? request.auth.token.nivel
+        : 0;
+    }
+
+    function isAdmin() {
+      return userLevel() == 5;
+    }
+
+    function requiredLevel() {
+      return (resource != null && resource.metadata != null
+              && 'nivel_requerido' in resource.metadata)
+        ? int(resource.metadata.nivel_requerido)
+        : 999;
+    }
+
+    match /{allPaths=**} {
+      allow read: if isSignedIn() && (isAdmin() || userLevel() >= requiredLevel());
+      allow write: if isAdmin();
+    }
+  }
+}

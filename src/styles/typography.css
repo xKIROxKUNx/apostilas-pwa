@@ -1,0 +1,20 @@
+:root {
+  --md-font: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.m3-display-small { font: 400 2.25rem/2.75rem var(--md-font); letter-spacing: 0; margin: 0; }
+.m3-headline-large { font: 400 2rem/2.5rem var(--md-font); letter-spacing: 0; margin: 0; }
+.m3-headline-medium { font: 400 1.75rem/2.25rem var(--md-font); letter-spacing: 0; margin: 0; }
+.m3-headline-small { font: 400 1.5rem/2rem var(--md-font); letter-spacing: 0; margin: 0; }
+
+.m3-title-large { font: 400 1.375rem/1.75rem var(--md-font); letter-spacing: 0; margin: 0; }
+.m3-title-medium { font: 500 1rem/1.5rem var(--md-font); letter-spacing: 0.009375em; margin: 0; }
+.m3-title-small { font: 500 0.875rem/1.25rem var(--md-font); letter-spacing: 0.00714em; margin: 0; }
+
+.m3-body-large { font: 400 1rem/1.5rem var(--md-font); letter-spacing: 0.03125em; margin: 0; }
+.m3-body-medium { font: 400 0.875rem/1.25rem var(--md-font); letter-spacing: 0.01786em; margin: 0; }
+.m3-body-small { font: 400 0.75rem/1rem var(--md-font); letter-spacing: 0.03333em; margin: 0; }
+
+.m3-label-large { font: 500 0.875rem/1.25rem var(--md-font); letter-spacing: 0.00714em; margin: 0; }
+.m3-label-medium { font: 500 0.75rem/1rem var(--md-font); letter-spacing: 0.04167em; margin: 0; }
+.m3-label-small { font: 500 0.6875rem/1rem var(--md-font); letter-spacing: 0.04545em; margin: 0; }

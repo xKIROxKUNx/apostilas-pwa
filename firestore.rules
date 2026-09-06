@@ -1,0 +1,65 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.nivel_acesso == 5;
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+
+      allow update: if isSelf(userId)
+                    && request.resource.data.diff(resource.data).affectedKeys().size() == 1
+                    && (
+                         (
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId'])
+                           && resource.data.get('deviceId', '') == ''
+                           && request.resource.data.deviceId is string
+                           && request.resource.data.deviceId != ''
+                         )
+                      || (
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId2'])
+                           && resource.data.keys().hasAll(['deviceId2'])
+                           && resource.data.deviceId2 == ''
+                           && request.resource.data.deviceId2 is string
+                           && request.resource.data.deviceId2 != ''
+                         )
+                      || (
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId3'])
+                           && resource.data.keys().hasAll(['deviceId3'])
+                           && resource.data.deviceId3 == ''
+                           && request.resource.data.deviceId3 is string
+                           && request.resource.data.deviceId3 != ''
+                         )
+                       );
+
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /apostilas/{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /app-ota/{docId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

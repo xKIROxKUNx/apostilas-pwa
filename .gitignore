@@ -1,0 +1,40 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+
+# WASM compilado (gerado por `npm run build:wasm` — não precisa versionar,
+# mas não tem problema se ficar; o build sempre recompila do zero)
+public/wasm/*.wasm
+public/wasm/*.wasm.map
+
+# Ambiente (contém credenciais do Firebase Web — NUNCA commitar)
+.env
+.env.local
+.env.*.local
+
+# Ferramentas internas — NUNCA neste repositório, que é PÚBLICO.
+#
+# Os scripts em Python daqui (teste de regras, sincronização de claims, auditoria
+# de tokens do Storage) não carregam credencial — pegam token do `gcloud` em
+# runtime —, mas descrevem o desenho do controle de acesso: onde o nível vive no
+# token, por que as regras de Storage não conseguem ler o Firestore, e casos de
+# teste que mapeiam as costuras. Num produto pago, isso é entregar o mapa.
+# Ficam no disco, fora do índice. Foram removidos do histórico em 22/08/2026.
+scripts/*.py
+
+# Configuração e cache de ferramentas locais
+.claude/
+*.local.json
+
+# Editor / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.log
+
+# TypeScript
+*.tsbuildinfo

@@ -1,0 +1,283 @@
+.m3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  background: transparent;
+  transition: box-shadow var(--md-dur-short4) var(--md-ease-standard);
+}
+
+.m3-btn--filled {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.m3-btn--filled:not(:disabled):hover {
+  box-shadow: var(--md-elev-1);
+}
+
+.m3-btn--tonal {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.m3-btn--text {
+  color: var(--md-primary);
+  padding: 0 12px;
+}
+
+.m3-btn--full { width: 100%; }
+
+.m3-btn::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 48px;
+}
+
+.m3-btn { position: relative; }
+
+.m3-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-shape-full);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+}
+
+.m3-icon-btn--primary { color: var(--md-primary); }
+.m3-icon-btn--error { color: var(--md-error); }
+
+.m3-card {
+  border-radius: var(--md-shape-lg);
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+  overflow: hidden;
+  transition:
+    box-shadow var(--md-dur-short4) var(--md-ease-standard),
+    background-color var(--md-dur-short4) var(--md-ease-standard);
+}
+
+.m3-card--elevated { box-shadow: var(--md-elev-1); }
+
+.m3-card--elevated.m3-interactive:hover { box-shadow: var(--md-elev-2); }
+
+.m3-card--filled { background: var(--md-surface-container-highest); }
+
+.m3-card--primary {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.m3-card--r-xl { border-radius: var(--md-shape-xl); }
+.m3-card--r-md { border-radius: var(--md-shape-md); }
+
+.m3-field {
+  position: relative;
+  display: block;
+}
+
+.m3-field__input {
+  width: 100%;
+  height: 56px;
+  padding: 20px 16px 6px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-xs);
+  background: transparent;
+  color: var(--md-on-surface);
+  font: 400 1rem/1.5rem var(--md-font);
+  outline: none;
+  transition: border-color var(--md-dur-short2) var(--md-ease-standard);
+}
+
+.m3-field__input:focus {
+  border-color: var(--md-primary);
+  border-width: 2px;
+  padding: 19px 15px 5px;
+}
+
+.m3-field--error .m3-field__input { border-color: var(--md-error); }
+
+.m3-field__label {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--md-on-surface-variant);
+  font: 400 1rem/1.5rem var(--md-font);
+  pointer-events: none;
+  transition:
+    top var(--md-dur-short4) var(--md-ease-standard),
+    font-size var(--md-dur-short4) var(--md-ease-standard),
+    color var(--md-dur-short2) var(--md-ease-standard);
+}
+
+.m3-field__input:focus + .m3-field__label,
+.m3-field__input:not(:placeholder-shown) + .m3-field__label {
+  top: 16px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.m3-field__input:focus + .m3-field__label { color: var(--md-primary); }
+.m3-field--error .m3-field__label { color: var(--md-error); }
+
+.m3-field__trailing {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.m3-field__support {
+  display: block;
+  padding: 4px 16px 0;
+  color: var(--md-on-surface-variant);
+}
+
+.m3-field--error .m3-field__support { color: var(--md-error); }
+
+.m3-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.4);
+  z-index: var(--z-sheet);
+  display: flex;
+  align-items: flex-end;
+  animation: m3-fade-in var(--md-dur-short4) var(--md-ease-standard);
+  overscroll-behavior: contain;
+}
+
+.m3-sheet {
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+  border-radius: var(--md-shape-xl) var(--md-shape-xl) 0 0;
+  box-shadow: var(--md-elev-3);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  animation: m3-slide-up var(--md-dur-medium4) var(--md-ease-emphasized-decelerate);
+}
+
+.m3-sheet__grab {
+  flex-shrink: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.m3-sheet__grab:active { cursor: grabbing; }
+
+.m3-sheet__handle {
+  width: 32px;
+  height: 4px;
+  margin: 12px auto 8px;
+  border-radius: var(--md-shape-full);
+  background: var(--md-outline-variant);
+}
+
+.m3-sheet__title {
+  padding: 4px 24px 12px;
+  color: var(--md-on-surface);
+  flex-shrink: 0;
+}
+
+.m3-sheet__body {
+  overflow-y: auto;
+  padding-bottom: 12px;
+  overscroll-behavior: contain;
+}
+
+.m3-sheet__empty {
+  padding: 24px;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+}
+
+.m3-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  color: var(--md-on-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.m3-list-item--selected { background: var(--md-secondary-container); }
+
+.m3-appbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 0 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  flex-shrink: 0;
+  position: relative;
+  z-index: var(--z-appbar);
+  padding-top: env(safe-area-inset-top, 0);
+  transition: box-shadow var(--md-dur-short4) var(--md-ease-standard);
+}
+
+.m3-appbar--raised { box-shadow: var(--md-elev-2); }
+
+.m3-appbar__title {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m3-divider {
+  height: 1px;
+  border: none;
+  margin: 0;
+  background: var(--md-outline-variant);
+}
+
+.m3-spinner {
+  border-radius: 50%;
+  border: 3px solid var(--md-surface-container-highest);
+  border-top-color: var(--md-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+.m3-snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: var(--z-snackbar);
+  max-width: min(88vw, 560px);
+  padding: 14px 16px;
+  border-radius: var(--md-shape-xs);
+  background: var(--md-inverse-surface);
+  color: var(--md-inverse-on-surface);
+  box-shadow: var(--md-elev-3);
+  text-align: center;
+  animation: m3-fade-in var(--md-dur-short4) var(--md-ease-standard);
+}

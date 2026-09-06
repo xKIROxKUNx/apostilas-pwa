@@ -1,0 +1,13 @@
+:root {
+  --md-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-ease-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --md-ease-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --md-ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-ease-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  --md-dur-short2: 100ms;
+  --md-dur-short4: 200ms;
+  --md-dur-medium2: 300ms;
+  --md-dur-medium4: 400ms;
+  --md-dur-long2: 500ms;
+}
