@@ -45,6 +45,7 @@ export interface TocEntry {
   title: string;
   pageIndex: number;
   depth: number;
+  topFraction?: number;
 }
 
 export interface ChapterNavInfo {

@@ -14,6 +14,13 @@ export type PdfDocState =
       aspectRatios: number[];
     };
 
+function destinationTop(dest: unknown[]): number | null {
+  const kind = (dest[1] as { name?: string } | undefined)?.name;
+  if (kind === "XYZ") return typeof dest[3] === "number" ? dest[3] : null;
+  if (kind === "FitH" || kind === "FitBH") return typeof dest[2] === "number" ? dest[2] : null;
+  return null;
+}
+
 async function extractToc(doc: PDFDocumentProxy): Promise<TocEntry[]> {
   const outline = await doc.getOutline();
   if (!outline || outline.length === 0) return [];
@@ -29,7 +36,18 @@ async function extractToc(doc: PDFDocumentProxy): Promise<TocEntry[]> {
         }
         if (Array.isArray(dest) && dest[0] != null) {
           const pageIndex = await doc.getPageIndex(dest[0]);
-          entries.push({ title: item.title || "Sem título", pageIndex, depth });
+          let topFraction: number | undefined;
+          const top = destinationTop(dest);
+          if (top !== null) {
+            const page = await doc.getPage(pageIndex + 1);
+            const viewport = page.getViewport({ scale: 1 });
+            const point = viewport.convertToViewportPoint(0, top);
+            const fraction = point[1] / viewport.height;
+            if (Number.isFinite(fraction)) {
+              topFraction = Math.min(Math.max(fraction, 0), 1);
+            }
+          }
+          entries.push({ title: item.title || "Sem título", pageIndex, depth, topFraction });
         }
       } catch {
       }

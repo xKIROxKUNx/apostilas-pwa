@@ -15,6 +15,11 @@ import { useZoom } from "@/pdf/useZoom";
 import { usePdfSearch } from "@/pdf/usePdfSearch";
 import { canOpenApostilaAnyDevice } from "@/security/wasm/accessGuard";
 import { getOrCreateDeviceId } from "@/security/deviceId";
+import {
+  getReadingPosition,
+  saveReadingPosition,
+  type ReadingPosition,
+} from "@/state/localPrefs";
 import { antiCopyGuard } from "@/security/antiCopyGuard";
 import { visibilityGuard } from "@/security/visibilityGuard";
 import { devtoolsGuard } from "@/security/devtoolsGuard";
@@ -33,6 +38,8 @@ import {
   Undo,
   ZoomOutMap,
 } from "@/components/icons";
+
+const POSITION_SAVE_DEBOUNCE_MS = 500;
 
 const READER_INK =
   getComputedStyle(document.documentElement).getPropertyValue("--reader-ink").trim() || "#d9453f";
@@ -123,68 +130,105 @@ export default function PdfReaderScreen() {
 
   const maxCachedPages = useMemo(() => maxCachedPagesForDevice(), []);
   const accessOrderRef = useRef<number[]>([]);
+  const visiblePagesRef = useRef<Set<number>>(new Set());
   const [renderSet, setRenderSet] = useState<Set<number>>(new Set());
 
-  const handlePageVisible = useCallback(
-    (pageIndex: number) => {
+  const handleVisibilityChange = useCallback(
+    (pageIndex: number, isIntersecting: boolean) => {
+      const visible = visiblePagesRef.current;
       const order = accessOrderRef.current;
-      const existingIdx = order.indexOf(pageIndex);
-      if (existingIdx !== -1) order.splice(existingIdx, 1);
-      order.push(pageIndex);
-      while (order.length > maxCachedPages) order.shift();
+
+      if (isIntersecting) {
+        visible.add(pageIndex);
+        const existingIdx = order.indexOf(pageIndex);
+        if (existingIdx !== -1) order.splice(existingIdx, 1);
+        order.push(pageIndex);
+      } else {
+        visible.delete(pageIndex);
+      }
+
+      while (order.length > maxCachedPages) {
+        const evictable = order.findIndex((p) => !visible.has(p));
+        if (evictable === -1) break;
+        order.splice(evictable, 1);
+      }
 
       setRenderSet(new Set(order));
     },
     [maxCachedPages],
   );
 
-  function seekToPage(pageIndex: number) {
-    const el = pageRefs.current.get(pageIndex);
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  function contentOffset(): number {
+    return contentRef.current?.offsetTop ?? 0;
   }
 
-  function seekToHit(pageIndex: number, topFraction: number | null) {
+  function pageIndexForOffset(offset: number): number {
+    const pages = pageRefs.current;
+    const count = pages.size;
+    if (count === 0) return 0;
+    const base = contentOffset();
+    let low = 0;
+    let high = count - 1;
+    let best = 0;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const el = pages.get(mid);
+      if (!el) break;
+      if (el.offsetTop - base <= offset) {
+        best = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return best;
+  }
+
+  function scrollToTarget(pageIndex: number, fraction: number | null, smooth: boolean) {
     const el = pageRefs.current.get(pageIndex);
     const scroller = containerRef.current;
     if (!el || !scroller) return;
-    if (topFraction === null) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-    const pageRect = el.getBoundingClientRect();
-    const viewRect = scroller.getBoundingClientRect();
-    const delta =
-      pageRect.top - viewRect.top + topFraction * pageRect.height - viewRect.height / 3;
-    scroller.scrollBy({ top: delta, behavior: "smooth" });
+    const pageTop = el.offsetTop - contentOffset();
+    const top =
+      fraction === null
+        ? pageTop
+        : pageTop + fraction * el.offsetHeight - scroller.clientHeight / 2;
+    scroller.scrollTo({ top: Math.max(top, 0), behavior: smooth ? "smooth" : "auto" });
+  }
+
+  function seekToPage(pageIndex: number, topFraction?: number) {
+    scrollToTarget(pageIndex, topFraction ?? null, true);
+  }
+
+  function seekToHit(pageIndex: number, topFraction: number | null) {
+    scrollToTarget(pageIndex, topFraction, true);
   }
 
   const [currentPage, setCurrentPage] = useState(0);
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container || docState.status !== "ready") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible) {
-          const idx = Number((visible.target as HTMLElement).dataset.pageIndex);
-          if (!Number.isNaN(idx)) setCurrentPage(idx);
-        }
-      },
-      { threshold: [0.5] },
-    );
-    pageRefs.current.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [docState.status]);
 
-  const { zoom, zoomSettled, resetZoom } = useZoom(
+  const { zoom, resetZoom } = useZoom(
     containerRef,
     contentRef,
     docState.status === "ready",
     !isDrawingMode,
   );
   const search = usePdfSearch(docState.status === "ready" ? docState.doc : null);
+
+  const positionScope = `${user?.uid ?? "anon"}:${apostilaId ?? "unknown"}`;
+  const positionScopeRef = useRef(positionScope);
+  positionScopeRef.current = positionScope;
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoredRef = useRef(false);
+
+  function currentReadingPosition(): ReadingPosition | null {
+    const scroller = containerRef.current;
+    if (!scroller || pageRefs.current.size === 0) return null;
+    const pageIndex = pageIndexForOffset(scroller.scrollTop);
+    const el = pageRefs.current.get(pageIndex);
+    if (!el || el.offsetHeight <= 0) return null;
+    const pageTop = el.offsetTop - contentOffset();
+    return { pageIndex, fraction: (scroller.scrollTop - pageTop) / el.offsetHeight };
+  }
 
   const [scrollFraction, setScrollFraction] = useState(0);
   useEffect(() => {
@@ -199,6 +243,14 @@ export default function PdfReaderScreen() {
         if (!el) return;
         const range = el.scrollHeight - el.clientHeight;
         setScrollFraction(range > 0 ? Math.min(Math.max(el.scrollTop / range, 0), 1) : 0);
+        setCurrentPage(pageIndexForOffset(el.scrollTop + el.clientHeight / 2));
+
+        if (!restoredRef.current) return;
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => {
+          const position = currentReadingPosition();
+          if (position) void saveReadingPosition(positionScopeRef.current, position);
+        }, POSITION_SAVE_DEBOUNCE_MS);
       });
     }
     container.addEventListener("scroll", onScroll, { passive: true });
@@ -207,6 +259,45 @@ export default function PdfReaderScreen() {
       if (frame) cancelAnimationFrame(frame);
     };
   }, [docState.status]);
+
+  useEffect(() => {
+    if (docState.status !== "ready" || restoredRef.current) return;
+    let cancelled = false;
+    (async () => {
+      const saved = await getReadingPosition(positionScopeRef.current);
+      if (cancelled) return;
+      if (saved && saved.pageIndex > 0 && saved.pageIndex < docState.pageCount) {
+        const el = pageRefs.current.get(saved.pageIndex);
+        const scroller = containerRef.current;
+        if (el && scroller) {
+          scroller.scrollTo({
+            top: Math.max(el.offsetTop - contentOffset() + saved.fraction * el.offsetHeight, 0),
+            behavior: "auto",
+          });
+        }
+      }
+      restoredRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [docState.status]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      const scroller = containerRef.current;
+      if (!restoredRef.current || !scroller || pageRefs.current.size === 0) return;
+      const pageIndex = pageIndexForOffset(scroller.scrollTop);
+      const el = pageRefs.current.get(pageIndex);
+      if (!el || el.offsetHeight <= 0) return;
+      const pageTop = el.offsetTop - contentOffset();
+      void saveReadingPosition(positionScopeRef.current, {
+        pageIndex,
+        fraction: (scroller.scrollTop - pageTop) / el.offsetHeight,
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (isSearching) searchInputRef.current?.focus();
@@ -383,9 +474,8 @@ export default function PdfReaderScreen() {
                   watermarkText={watermarkText}
                   highlights={search.highlightsForPageIndex(pageIndex)}
                   currentHighlight={search.currentHighlightForPage(pageIndex)}
-                  zoomSettled={zoomSettled}
                   onStroke={(points) => annotations.addStroke(pageIndex, points, READER_INK, 3)}
-                  onVisible={handlePageVisible}
+                  onVisibilityChange={handleVisibilityChange}
                 />
               </div>
             ))}
@@ -420,8 +510,8 @@ export default function PdfReaderScreen() {
           entries={docState.toc}
           currentPageIndex={currentPage}
           onClose={() => setShowToc(false)}
-          onEntryClick={(pageIndex) => {
-            seekToPage(pageIndex);
+          onEntryClick={(pageIndex, topFraction) => {
+            seekToPage(pageIndex, topFraction);
             setShowToc(false);
           }}
         />

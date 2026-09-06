@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ZOOM_RERENDER_DEBOUNCE_MS } from "./renderScale";
 
 export const MIN_ZOOM = 0.75;
 export const MAX_ZOOM = 5;
@@ -12,10 +11,16 @@ const TAP_MAX_MS = 250;
 const SCROLL_TOLERANCE_PX = 2;
 
 interface Anchor {
+  element: HTMLElement | null;
   fracX: number;
   fracY: number;
   clientX: number;
   clientY: number;
+}
+
+function pageElementAt(clientX: number, clientY: number): HTMLElement | null {
+  const hit = document.elementFromPoint(clientX, clientY);
+  return (hit?.closest("[data-page-index]") as HTMLElement | null) ?? null;
 }
 
 export function useZoom(
@@ -28,21 +33,17 @@ export function useZoom(
   const zoomRef = useRef(1);
   zoomRef.current = zoom;
 
-  const [zoomSettled, setZoomSettled] = useState(1);
-  useEffect(() => {
-    const timer = setTimeout(() => setZoomSettled(zoom), ZOOM_RERENDER_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [zoom]);
-
   const anchorRef = useRef<Anchor | null>(null);
 
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
+    anchorRef.current = null;
     const scroller = scrollRef.current;
-    const content = contentRef.current;
-    if (!anchor || !scroller || !content) return;
+    const target = anchor?.element ?? contentRef.current;
+    if (!anchor || !scroller || !target) return;
 
-    const rect = content.getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
     const desiredClientX = rect.left + anchor.fracX * rect.width;
     const desiredClientY = rect.top + anchor.fracY * rect.height;
     scroller.scrollLeft += desiredClientX - anchor.clientX;
@@ -51,17 +52,21 @@ export function useZoom(
 
   const zoomTo = useCallback(
     (next: number, clientX: number, clientY: number) => {
-      const content = contentRef.current;
-      if (!content) return;
       const clamped = Math.min(Math.max(next, MIN_ZOOM), MAX_ZOOM);
-      const rect = content.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        anchorRef.current = {
-          fracX: (clientX - rect.left) / rect.width,
-          fracY: (clientY - rect.top) / rect.height,
-          clientX,
-          clientY,
-        };
+      if (clamped === zoomRef.current) return;
+
+      const target = pageElementAt(clientX, clientY) ?? contentRef.current;
+      if (target) {
+        const rect = target.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          anchorRef.current = {
+            element: target === contentRef.current ? null : target,
+            fracX: (clientX - rect.left) / rect.width,
+            fracY: (clientY - rect.top) / rect.height,
+            clientX,
+            clientY,
+          };
+        }
       }
       setZoom(clamped);
     },
@@ -75,6 +80,8 @@ export function useZoom(
 
     let pinchStartDistance = 0;
     let pinchStartZoom = 1;
+    let panLastX: number | null = null;
+    let panLastY: number | null = null;
     let lastTapAt = 0;
     let lastTapX = 0;
     let lastTapY = 0;
@@ -92,6 +99,25 @@ export function useZoom(
         touches[0].clientY - touches[1].clientY,
       );
 
+    const midpoint = (touches: TouchList) => ({
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    });
+
+    function armPinch(touches: TouchList) {
+      pinchStartDistance = distance(touches);
+      pinchStartZoom = zoomRef.current;
+      const mid = midpoint(touches);
+      panLastX = mid.x;
+      panLastY = mid.y;
+    }
+
+    function disarmPinch() {
+      pinchStartDistance = 0;
+      panLastX = null;
+      panLastY = null;
+    }
+
     function onTouchStart(e: TouchEvent) {
       if (e.touches.length === 1) {
         const touch = e.touches[0];
@@ -107,10 +133,12 @@ export function useZoom(
       gestureIsTap = false;
       lastTapAt = 0;
 
-      if (e.touches.length !== 2) return;
+      if (e.touches.length !== 2) {
+        disarmPinch();
+        return;
+      }
       e.preventDefault();
-      pinchStartDistance = distance(e.touches);
-      pinchStartZoom = zoomRef.current;
+      armPinch(e.touches);
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -126,16 +154,24 @@ export function useZoom(
       }
       if (e.touches.length !== 2 || pinchStartDistance <= 0) return;
       e.preventDefault();
-      const ratio = distance(e.touches) / pinchStartDistance;
-      zoomTo(
-        pinchStartZoom * ratio,
-        (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        (e.touches[0].clientY + e.touches[1].clientY) / 2,
-      );
+
+      const mid = midpoint(e.touches);
+      if (panLastX !== null && panLastY !== null) {
+        el!.scrollLeft -= mid.x - panLastX;
+        el!.scrollTop -= mid.y - panLastY;
+      }
+      panLastX = mid.x;
+      panLastY = mid.y;
+
+      zoomTo((pinchStartZoom * distance(e.touches)) / pinchStartDistance, mid.x, mid.y);
     }
 
     function onTouchEnd(e: TouchEvent) {
-      if (e.touches.length < 2) pinchStartDistance = 0;
+      if (e.touches.length === 2) {
+        armPinch(e.touches);
+        return;
+      }
+      if (e.touches.length < 2) disarmPinch();
       if (e.touches.length !== 0 || e.changedTouches.length !== 1) return;
 
       const touch = e.changedTouches[0];
@@ -171,7 +207,7 @@ export function useZoom(
     }
 
     function onTouchCancel() {
-      pinchStartDistance = 0;
+      disarmPinch();
       gestureIsTap = false;
       lastTapAt = 0;
     }
@@ -193,5 +229,5 @@ export function useZoom(
     setZoom(1);
   }, []);
 
-  return { zoom, zoomSettled, resetZoom };
+  return { zoom, resetZoom };
 }

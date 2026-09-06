@@ -88,7 +88,10 @@ export function usePdfSearch(doc: PDFDocumentProxy | null) {
     const hit = results[currentIndex];
     if (!hit) return null;
     const rect = highlights.get(hit.pageIndex)?.[hit.ordinalInPage]?.[0];
-    return { pageIndex: hit.pageIndex, topFraction: rect?.top ?? null };
+    return {
+      pageIndex: hit.pageIndex,
+      topFraction: rect ? (rect.top + rect.bottom) / 2 : null,
+    };
   }, [results, currentIndex, highlights]);
 
   const currentHighlightForPage = useCallback(

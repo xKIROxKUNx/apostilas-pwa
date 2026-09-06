@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import type { Stroke, StrokePoint } from "@/types/domain";
-import { computeRenderScale, RERENDER_TOLERANCE } from "./renderScale";
+import { computeRenderScale, RERENDER_TOLERANCE, ZOOM_RERENDER_DEBOUNCE_MS } from "./renderScale";
 import { drawWatermark } from "@/security/watermark";
 import DrawingOverlay from "./DrawingOverlay";
 import HighlightOverlay from "./HighlightOverlay";
@@ -17,9 +17,8 @@ interface PdfPageProps {
   watermarkText: string;
   highlights: HighlightRect[][];
   currentHighlight: number | null;
-  zoomSettled: number;
   onStroke: (points: StrokePoint[]) => void;
-  onVisible: (pageIndex: number, widthPx: number) => void;
+  onVisibilityChange: (pageIndex: number, isIntersecting: boolean) => void;
 }
 
 export default function PdfPage({
@@ -32,16 +31,20 @@ export default function PdfPage({
   watermarkText,
   highlights,
   currentHighlight,
-  zoomSettled,
   onStroke,
-  onVisible,
+  onVisibilityChange,
 }: PdfPageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderedWidthRef = useRef<number | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [rendered, setRendered] = useState(false);
+  const [cssWidth, setCssWidth] = useState(0);
   const [overlaySize, setOverlaySize] = useState({ width: 0, height: 0 });
+
+  const visibilityRef = useRef(onVisibilityChange);
+  visibilityRef.current = onVisibilityChange;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -49,9 +52,7 @@ export default function PdfPage({
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            onVisible(pageIndex, el.clientWidth);
-          }
+          visibilityRef.current(pageIndex, entry.isIntersecting);
         }
       },
       { rootMargin: "150% 0px" },
@@ -59,6 +60,34 @@ export default function PdfPage({
     observer.observe(el);
     return () => observer.disconnect();
   }, [pageIndex]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const apply = (width: number) => {
+      if (width > 0) setCssWidth((prev) => (prev === width ? prev : width));
+    };
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? el.clientWidth;
+      if (width <= 0) return;
+      if (renderedWidthRef.current === null) {
+        apply(width);
+        return;
+      }
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = setTimeout(() => apply(width), ZOOM_RERENDER_DEBOUNCE_MS);
+    });
+
+    observer.observe(el);
+    apply(el.clientWidth);
+
+    return () => {
+      observer.disconnect();
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -76,7 +105,8 @@ export default function PdfPage({
       return;
     }
 
-    const targetWidthCss = container.clientWidth;
+    const targetWidthCss = cssWidth > 0 ? cssWidth : container.clientWidth;
+    if (targetWidthCss <= 0) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const targetWidthPx = targetWidthCss * dpr;
 
@@ -123,7 +153,7 @@ export default function PdfPage({
       cancelled = true;
       renderTaskRef.current?.cancel();
     };
-  }, [doc, pageIndex, shouldRender, watermarkText, zoomSettled]);
+  }, [doc, pageIndex, shouldRender, watermarkText, cssWidth]);
 
   return (
     <div

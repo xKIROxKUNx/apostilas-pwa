@@ -5,7 +5,7 @@ import { chapterIndexForPage } from "./usePdfDocument";
 interface TocSheetProps {
   entries: TocEntry[];
   currentPageIndex: number;
-  onEntryClick: (pageIndex: number) => void;
+  onEntryClick: (pageIndex: number, topFraction?: number) => void;
   onClose: () => void;
 }
 
@@ -28,7 +28,7 @@ export default function TocSheet({
           <div key={i} data-sheet-active={i === atual ? "" : undefined}>
             {i > 0 && <Divider />}
             <ListItem
-              onClick={() => onEntryClick(entry.pageIndex)}
+              onClick={() => onEntryClick(entry.pageIndex, entry.topFraction)}
               style={{ paddingLeft: 24 + entry.depth * 16 }}
             >
               <span

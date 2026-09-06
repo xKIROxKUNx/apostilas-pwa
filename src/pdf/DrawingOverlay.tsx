@@ -23,7 +23,8 @@ export default function DrawingOverlay({
 }: DrawingOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const currentPointsRef = useRef<StrokePoint[]>([]);
-  const drawingRef = useRef(false);
+  const activePointersRef = useRef<Set<number>>(new Set());
+  const strokePointerRef = useRef<number | null>(null);
 
   const redraw = () => {
     const canvas = canvasRef.current;
@@ -61,6 +62,16 @@ export default function DrawingOverlay({
     redraw();
   }, [strokes, width, height]);
 
+  useEffect(() => {
+    if (isDrawingMode) return;
+    activePointersRef.current.clear();
+    strokePointerRef.current = null;
+    if (currentPointsRef.current.length > 0) {
+      currentPointsRef.current = [];
+      redraw();
+    }
+  }, [isDrawingMode]);
+
   function toNormalized(e: React.PointerEvent<HTMLCanvasElement>): StrokePoint {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
@@ -69,26 +80,51 @@ export default function DrawingOverlay({
     return { x: Math.min(Math.max(x, 0), 1), y: Math.min(Math.max(y, 0), 1) };
   }
 
+  function discardStroke(target: Element) {
+    const pointerId = strokePointerRef.current;
+    if (pointerId !== null && target.hasPointerCapture?.(pointerId)) {
+      target.releasePointerCapture(pointerId);
+    }
+    strokePointerRef.current = null;
+    if (currentPointsRef.current.length > 0) {
+      currentPointsRef.current = [];
+      redraw();
+    }
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!isDrawingMode) return;
+    const pointers = activePointersRef.current;
+    pointers.add(e.pointerId);
+
+    if (pointers.size > 1) {
+      discardStroke(e.currentTarget);
+      return;
+    }
+
     (e.target as Element).setPointerCapture(e.pointerId);
-    drawingRef.current = true;
+    strokePointerRef.current = e.pointerId;
     currentPointsRef.current = [toNormalized(e)];
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!isDrawingMode || !drawingRef.current) return;
+    if (!isDrawingMode) return;
+    if (strokePointerRef.current !== e.pointerId) return;
+    if (activePointersRef.current.size > 1) return;
     currentPointsRef.current.push(toNormalized(e));
     redraw();
   }
 
-  function handlePointerUp() {
-    if (!isDrawingMode || !drawingRef.current) return;
-    drawingRef.current = false;
-    if (currentPointsRef.current.length >= 2) {
-      onStroke(currentPointsRef.current);
-    }
+  function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!isDrawingMode) return;
+    activePointersRef.current.delete(e.pointerId);
+
+    if (strokePointerRef.current !== e.pointerId) return;
+    strokePointerRef.current = null;
+
+    const points = currentPointsRef.current;
     currentPointsRef.current = [];
+    if (points.length >= 2) onStroke(points);
     redraw();
   }
 
