@@ -27,6 +27,12 @@ export async function forceSignOut(): Promise<void> {
   await signOut(auth);
 }
 
+export function observeAuthState(
+  callback: (user: FirebaseUser | null) => void,
+): () => void {
+  return onAuthStateChanged(auth, callback);
+}
+
 export function waitForInitialAuthState(): Promise<FirebaseUser | null> {
   return new Promise((resolve) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {

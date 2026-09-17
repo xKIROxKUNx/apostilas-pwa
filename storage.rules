@@ -17,6 +17,11 @@ service firebase.storage {
       return userLevel() == 5;
     }
 
+    function assinaturaExpirada() {
+      return 'expira_em' in request.auth.token
+        && request.time.toMillis() >= request.auth.token.expira_em;
+    }
+
     function requiredLevel() {
       return (resource != null && resource.metadata != null
               && 'nivel_requerido' in resource.metadata)
@@ -25,7 +30,8 @@ service firebase.storage {
     }
 
     match /{allPaths=**} {
-      allow read: if isSignedIn() && (isAdmin() || userLevel() >= requiredLevel());
+      allow read: if isSignedIn()
+        && (isAdmin() || (!assinaturaExpirada() && userLevel() >= requiredLevel()));
       allow write: if isAdmin();
     }
   }

@@ -1,13 +1,15 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import SplashScreen from "@/screens/SplashScreen";
 import LoginScreen from "@/screens/LoginScreen";
 import HomeScreen from "@/screens/HomeScreen";
+import SubscriptionExpiredScreen from "@/screens/SubscriptionExpiredScreen";
 import { initAccessGuard } from "@/security/wasm/accessGuard";
 import { purgeLegacyStrokes } from "@/pdf/annotationsStore";
 import { AuthProvider, useAuth } from "@/state/AuthContext";
 import { ThemeProvider } from "@/state/ThemeContext";
-import { ApostilasProvider } from "@/state/ApostilasContext";
+import { ApostilasProvider, useApostilas } from "@/state/ApostilasContext";
+import { useSubscription } from "@/state/useSubscription";
 
 const PdfReaderScreen = lazy(() => import("@/screens/PdfReaderScreen"));
 
@@ -16,6 +18,16 @@ function RequireSession({ children }: { children: React.ReactNode }) {
   if (sessionState === "checking") return null;
   if (sessionState !== "valid") return <Navigate to="/login" replace />;
   return <>{children}</>;
+}
+
+function RequireSubscription({ children }: { children: React.ReactNode }) {
+  const { userProfile, loading } = useApostilas();
+  const { expirada } = useSubscription();
+  const bloqueado = useRef(false);
+
+  if (!loading) bloqueado.current = userProfile !== null && expirada;
+
+  return bloqueado.current ? <SubscriptionExpiredScreen /> : <>{children}</>;
 }
 
 function RedirectIfLoggedIn({ children }: { children: React.ReactNode }) {
@@ -40,7 +52,9 @@ function AppRoutes() {
         path="/home"
         element={
           <RequireSession>
-            <HomeScreen />
+            <RequireSubscription>
+              <HomeScreen />
+            </RequireSubscription>
           </RequireSession>
         }
       />
@@ -48,9 +62,11 @@ function AppRoutes() {
         path="/apostila/:apostilaId"
         element={
           <RequireSession>
-            <Suspense fallback={<RouteFallback />}>
-              <PdfReaderScreen />
-            </Suspense>
+            <RequireSubscription>
+              <Suspense fallback={<RouteFallback />}>
+                <PdfReaderScreen />
+              </Suspense>
+            </RequireSubscription>
           </RequireSession>
         }
       />

@@ -21,6 +21,7 @@ interface AuthContextValue {
   consumeBlockedMessage: () => void;
   login: (email: string, password: string, nickname: string) => Promise<void>;
   logout: () => Promise<void>;
+  endSession: () => Promise<void>;
   savedNickname: string;
 }
 
@@ -44,6 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     getSavedNickname().then(setSavedNickname);
+  }, []);
+
+  useEffect(() => {
+    return authService.observeAuthState((atual) => {
+      if (atual !== null) return;
+      setUser(null);
+      setSessionState((estado) => (estado === "valid" ? "invalid" : estado));
+    });
   }, []);
 
   useEffect(() => {
@@ -120,6 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionState("invalid");
   };
 
+  const endSession = async () => {
+    await authService.forceSignOut();
+    setUser(null);
+    setSessionState("invalid");
+  };
+
   const consumeBlockedMessage = () => setBlockedMessage(null);
 
   return (
@@ -131,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         consumeBlockedMessage,
         login,
         logout,
+        endSession,
         savedNickname,
       }}
     >

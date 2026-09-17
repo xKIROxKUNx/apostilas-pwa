@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/state/AuthContext";
 import { useApostilas } from "@/state/ApostilasContext";
+import { useSubscription } from "@/state/useSubscription";
+import { DIAS_ALERTA, DIAS_AVISO, textoDiasRestantes } from "@/types/subscription";
 import { hasAccess, toRoleName, type Apostila } from "@/types/domain";
 import { canOpenApostilaAnyDevice } from "@/security/wasm/accessGuard";
 import { getOrCreateDeviceId } from "@/security/deviceId";
@@ -28,6 +30,7 @@ const CORES_MATERIA = [
 export default function HomeScreen() {
   const { logout, savedNickname, user } = useAuth();
   const { userProfile, apostilas, loading, error, refresh } = useApostilas();
+  const { diasRestantes } = useSubscription();
   const navigate = useNavigate();
   const [toast, setToast] = useState<string | null>(null);
 
@@ -43,6 +46,8 @@ export default function HomeScreen() {
 
   const userLevel = userProfile?.nivelAcesso ?? 0;
   const displayName = savedNickname || user?.email || "Estudante";
+  const mostrarContagem = diasRestantes !== null && diasRestantes <= DIAS_AVISO;
+  const mostrarAlerta = diasRestantes !== null && diasRestantes <= DIAS_ALERTA;
 
   async function handleOpen(apostila: Apostila) {
     const deviceId = await getOrCreateDeviceId();
@@ -82,6 +87,15 @@ export default function HomeScreen() {
         {userProfile && (
           <p className="m3-body-large" style={styles.assinatura}>
             Assinatura: {toRoleName(userProfile.nivelAcesso)}
+            {mostrarContagem && diasRestantes !== null
+              ? ` · ${textoDiasRestantes(diasRestantes)}`
+              : null}
+          </p>
+        )}
+
+        {mostrarAlerta && (
+          <p className="m3-body-medium" style={styles.alerta} role="alert">
+            Contate o administrador para renovar
           </p>
         )}
         <p className="m3-body-medium" style={styles.welcomeHint}>
@@ -236,6 +250,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   welcome: { padding: 20 },
   assinatura: { margin: "8px 0 0" },
+  alerta: { margin: "8px 0 0", color: "var(--md-error)" },
   welcomeHint: { margin: "4px 0 0", opacity: 0.8 },
   centerMsg: {
     display: "flex",

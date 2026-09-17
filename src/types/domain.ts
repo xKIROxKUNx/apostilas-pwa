@@ -2,6 +2,7 @@ export interface UserProfile {
   email: string;
   nivelAcesso: number;
   deviceIds: string[];
+  assinaturaExpiraEm: Date | null;
 }
 
 export interface Apostila {

@@ -1,9 +1,13 @@
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { Timestamp, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "./client";
 import type { UserProfile } from "@/types/domain";
 import { DeviceBindingError } from "@/types/domain";
 import { deviceIdsMatch } from "@/security/wasm/accessGuard";
 import { boundDeviceIds, decideBinding } from "./deviceSlots";
+
+function toDate(valor: unknown): Date | null {
+  return valor instanceof Timestamp ? valor.toDate() : null;
+}
 
 function requireUid(): string {
   const uid = auth.currentUser?.uid;
@@ -29,6 +33,7 @@ export async function getUserProfile(): Promise<UserProfile> {
     email: data.email ?? "",
     nivelAcesso: typeof data.nivel_acesso === "number" ? data.nivel_acesso : 1,
     deviceIds: boundDeviceIds(data),
+    assinaturaExpiraEm: toDate(data.assinatura_expira_em),
   };
 }
 

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApostilas } from "@/state/ApostilasContext";
 import { useAuth } from "@/state/AuthContext";
+import { useSubscription } from "@/state/useSubscription";
+import SubscriptionExpiredScreen from "@/screens/SubscriptionExpiredScreen";
 import { usePdfDocument } from "@/pdf/usePdfDocument";
 import { useAnnotations } from "@/pdf/useAnnotations";
 import { downloadPdfBytes } from "@/firebase/pdfService";
-import { toFriendlyMessage } from "@/firebase/errorMessages";
+import { isStorageDenied, toFriendlyMessage } from "@/firebase/errorMessages";
 import { maxCachedPagesForDevice } from "@/pdf/memoryCalibration";
 import PdfPage from "@/pdf/PdfPage";
 import FastScroller from "@/pdf/FastScroller";
@@ -49,11 +51,13 @@ export default function PdfReaderScreen() {
   const navigate = useNavigate();
   const { findApostila, userProfile, loading: apostilasLoading } = useApostilas();
   const { user } = useAuth();
+  const { expirada } = useSubscription();
 
   const apostila = apostilaId ? findApostila(apostilaId) : undefined;
 
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
   const [downloadError, setDownloadError] = useState<Error | null>(null);
+  const [negadoPeloServidor, setNegadoPeloServidor] = useState(false);
   const [accessState, setAccessState] = useState<"checking" | "allowed" | "denied">("checking");
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -69,7 +73,7 @@ export default function PdfReaderScreen() {
 
   useEffect(() => {
     if (apostilasLoading) return;
-    if (!apostila || !userProfile) {
+    if (!apostila || !userProfile || expirada) {
       setAccessState("denied");
       return;
     }
@@ -87,7 +91,7 @@ export default function PdfReaderScreen() {
     return () => {
       cancelled = true;
     };
-  }, [apostila, userProfile, apostilasLoading]);
+  }, [apostila, userProfile, apostilasLoading, expirada]);
 
   useEffect(() => {
     if (!apostila || accessState !== "allowed") return;
@@ -97,7 +101,12 @@ export default function PdfReaderScreen() {
         if (!cancelled) setPdfBytes(bytes);
       })
       .catch((err) => {
-        if (!cancelled) setDownloadError(err instanceof Error ? err : new Error(String(err)));
+        if (cancelled) return;
+        if (isStorageDenied(err)) {
+          setNegadoPeloServidor(true);
+          return;
+        }
+        setDownloadError(err instanceof Error ? err : new Error(String(err)));
       });
     return () => {
       cancelled = true;
@@ -313,6 +322,10 @@ export default function PdfReaderScreen() {
     setIsSearching(false);
     setShowSearchResults(false);
     search.clear();
+  }
+
+  if (negadoPeloServidor) {
+    return <SubscriptionExpiredScreen />;
   }
 
   if (apostilasLoading || accessState === "checking") {

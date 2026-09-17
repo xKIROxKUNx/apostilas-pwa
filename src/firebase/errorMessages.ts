@@ -1,5 +1,10 @@
 import { DeviceBindingError } from "@/types/domain";
 
+export function isStorageDenied(error: unknown): boolean {
+  const code = (error as { code?: string })?.code ?? "";
+  return code === "storage/unauthorized" || code === "storage/unauthenticated";
+}
+
 export function toFriendlyMessage(error: unknown): string {
   if (error instanceof DeviceBindingError) {
     return error.message;
