@@ -220,6 +220,7 @@ export default function PdfReaderScreen() {
     contentRef,
     docState.status === "ready",
     !isDrawingMode,
+    pageRefs,
   );
   const search = usePdfSearch(docState.status === "ready" ? docState.doc : null);
 

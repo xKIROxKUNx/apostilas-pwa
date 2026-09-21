@@ -10,7 +10,9 @@ body,
 
 html.reader-open,
 html.reader-open body {
-  overscroll-behavior-y: none;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {

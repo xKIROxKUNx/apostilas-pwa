@@ -11,16 +11,57 @@ const TAP_MAX_MS = 250;
 const SCROLL_TOLERANCE_PX = 2;
 
 interface Anchor {
-  element: HTMLElement | null;
+  element: HTMLElement;
   fracX: number;
   fracY: number;
   clientX: number;
   clientY: number;
 }
 
-function pageElementAt(clientX: number, clientY: number): HTMLElement | null {
-  const hit = document.elementFromPoint(clientX, clientY);
-  return (hit?.closest("[data-page-index]") as HTMLElement | null) ?? null;
+function findPageElement(
+  clientY: number,
+  contentRef: React.RefObject<HTMLDivElement | null>,
+  pageRefs?: React.RefObject<Map<number, HTMLDivElement>>,
+): HTMLElement | null {
+  const content = contentRef.current;
+  const map = pageRefs?.current;
+  const count = Math.max(map?.size ?? 0, content?.children.length ?? 0);
+  if (count === 0) return content;
+
+  const getElement = (index: number): HTMLElement | null => {
+    return map?.get(index) ?? (content?.children[index] as HTMLElement | null) ?? null;
+  };
+
+  const firstEl = getElement(0);
+  if (!firstEl) return content;
+  const firstRect = firstEl.getBoundingClientRect();
+  if (clientY < firstRect.top) return firstEl;
+
+  const lastEl = getElement(count - 1);
+  if (!lastEl) return content;
+  const lastRect = lastEl.getBoundingClientRect();
+  if (clientY > lastRect.bottom) return lastEl;
+
+  let low = 0;
+  let high = count - 1;
+  let best = 0;
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const el = getElement(mid);
+    if (!el) break;
+    const rect = el.getBoundingClientRect();
+    if (clientY < rect.top) {
+      high = mid - 1;
+    } else if (clientY > rect.bottom) {
+      best = mid;
+      low = mid + 1;
+    } else {
+      return el;
+    }
+  }
+
+  return getElement(best) ?? firstEl;
 }
 
 export function useZoom(
@@ -28,19 +69,21 @@ export function useZoom(
   contentRef: React.RefObject<HTMLDivElement | null>,
   enabled: boolean,
   doubleTapEnabled = true,
+  pageRefs?: React.RefObject<Map<number, HTMLDivElement>>,
 ) {
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
   zoomRef.current = zoom;
 
   const anchorRef = useRef<Anchor | null>(null);
+  const isPinchingRef = useRef(false);
 
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
-    anchorRef.current = null;
+    if (!anchor) return;
     const scroller = scrollRef.current;
-    const target = anchor?.element ?? contentRef.current;
-    if (!anchor || !scroller || !target) return;
+    const target = anchor.element;
+    if (!scroller || !target) return;
 
     const rect = target.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
@@ -48,29 +91,35 @@ export function useZoom(
     const desiredClientY = rect.top + anchor.fracY * rect.height;
     scroller.scrollLeft += desiredClientX - anchor.clientX;
     scroller.scrollTop += desiredClientY - anchor.clientY;
-  }, [zoom, scrollRef, contentRef]);
+
+    if (!isPinchingRef.current) {
+      anchorRef.current = null;
+    }
+  }, [zoom, scrollRef]);
 
   const zoomTo = useCallback(
     (next: number, clientX: number, clientY: number) => {
       const clamped = Math.min(Math.max(next, MIN_ZOOM), MAX_ZOOM);
       if (clamped === zoomRef.current) return;
 
-      const target = pageElementAt(clientX, clientY) ?? contentRef.current;
-      if (target) {
-        const rect = target.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          anchorRef.current = {
-            element: target === contentRef.current ? null : target,
-            fracX: (clientX - rect.left) / rect.width,
-            fracY: (clientY - rect.top) / rect.height,
-            clientX,
-            clientY,
-          };
-        }
+      let target = findPageElement(clientY, contentRef, pageRefs);
+      let rect = target?.getBoundingClientRect();
+      if (!target || !rect || rect.width <= 0 || rect.height <= 0) {
+        target = contentRef.current;
+        rect = target?.getBoundingClientRect();
+      }
+      if (target && rect && rect.width > 0 && rect.height > 0) {
+        anchorRef.current = {
+          element: target,
+          fracX: (clientX - rect.left) / rect.width,
+          fracY: (clientY - rect.top) / rect.height,
+          clientX,
+          clientY,
+        };
       }
       setZoom(clamped);
     },
-    [contentRef],
+    [contentRef, pageRefs],
   );
 
   useEffect(() => {
@@ -80,8 +129,6 @@ export function useZoom(
 
     let pinchStartDistance = 0;
     let pinchStartZoom = 1;
-    let panLastX: number | null = null;
-    let panLastY: number | null = null;
     let lastTapAt = 0;
     let lastTapX = 0;
     let lastTapY = 0;
@@ -108,14 +155,36 @@ export function useZoom(
       pinchStartDistance = distance(touches);
       pinchStartZoom = zoomRef.current;
       const mid = midpoint(touches);
-      panLastX = mid.x;
-      panLastY = mid.y;
+      let target = findPageElement(mid.y, contentRef, pageRefs);
+      let rect = target?.getBoundingClientRect();
+      if (!target || !rect || rect.width <= 0 || rect.height <= 0) {
+        target = contentRef.current;
+        rect = target?.getBoundingClientRect();
+      }
+      if (target && rect && rect.width > 0 && rect.height > 0) {
+        anchorRef.current = {
+          element: target,
+          fracX: (mid.x - rect.left) / rect.width,
+          fracY: (mid.y - rect.top) / rect.height,
+          clientX: mid.x,
+          clientY: mid.y,
+        };
+        isPinchingRef.current = true;
+      }
     }
+
+    let disarmRaf = 0;
 
     function disarmPinch() {
       pinchStartDistance = 0;
-      panLastX = null;
-      panLastY = null;
+      isPinchingRef.current = false;
+      if (disarmRaf) cancelAnimationFrame(disarmRaf);
+      disarmRaf = requestAnimationFrame(() => {
+        disarmRaf = 0;
+        if (!isPinchingRef.current) {
+          anchorRef.current = null;
+        }
+      });
     }
 
     function onTouchStart(e: TouchEvent) {
@@ -156,14 +225,30 @@ export function useZoom(
       e.preventDefault();
 
       const mid = midpoint(e.touches);
-      if (panLastX !== null && panLastY !== null) {
-        el!.scrollLeft -= mid.x - panLastX;
-        el!.scrollTop -= mid.y - panLastY;
-      }
-      panLastX = mid.x;
-      panLastY = mid.y;
+      const dist = distance(e.touches);
+      const nextZoom = (pinchStartZoom * dist) / pinchStartDistance;
+      const clamped = Math.min(Math.max(nextZoom, MIN_ZOOM), MAX_ZOOM);
 
-      zoomTo((pinchStartZoom * distance(e.touches)) / pinchStartDistance, mid.x, mid.y);
+      if (anchorRef.current) {
+        anchorRef.current.clientX = mid.x;
+        anchorRef.current.clientY = mid.y;
+      }
+
+      if (clamped === zoomRef.current) {
+        const anchor = anchorRef.current;
+        if (anchor && anchor.element) {
+          const rect = anchor.element.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            const desiredClientX = rect.left + anchor.fracX * rect.width;
+            const desiredClientY = rect.top + anchor.fracY * rect.height;
+            el!.scrollLeft += desiredClientX - mid.x;
+            el!.scrollTop += desiredClientY - mid.y;
+          }
+        }
+        return;
+      }
+
+      setZoom(clamped);
     }
 
     function onTouchEnd(e: TouchEvent) {
@@ -212,19 +297,37 @@ export function useZoom(
       lastTapAt = 0;
     }
 
+    function onGesture(e: Event) {
+      e.preventDefault();
+    }
+
     el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd);
     el.addEventListener("touchcancel", onTouchCancel);
+    el.addEventListener("gesturestart", onGesture, { passive: false });
+    el.addEventListener("gesturechange", onGesture, { passive: false });
+    el.addEventListener("gestureend", onGesture, { passive: false });
+    document.addEventListener("gesturestart", onGesture, { passive: false });
+    document.addEventListener("gesturechange", onGesture, { passive: false });
+    document.addEventListener("gestureend", onGesture, { passive: false });
     return () => {
+      if (disarmRaf) cancelAnimationFrame(disarmRaf);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchCancel);
+      el.removeEventListener("gesturestart", onGesture);
+      el.removeEventListener("gesturechange", onGesture);
+      el.removeEventListener("gestureend", onGesture);
+      document.removeEventListener("gesturestart", onGesture);
+      document.removeEventListener("gesturechange", onGesture);
+      document.removeEventListener("gestureend", onGesture);
     };
-  }, [scrollRef, zoomTo, enabled, doubleTapEnabled]);
+  }, [scrollRef, contentRef, pageRefs, zoomTo, enabled, doubleTapEnabled]);
 
   const resetZoom = useCallback(() => {
+    isPinchingRef.current = false;
     anchorRef.current = null;
     setZoom(1);
   }, []);
