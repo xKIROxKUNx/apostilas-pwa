@@ -9,6 +9,7 @@ import { useAnnotations } from "@/pdf/useAnnotations";
 import { downloadPdfBytes } from "@/firebase/pdfService";
 import { isStorageDenied, toFriendlyMessage } from "@/firebase/errorMessages";
 import { maxCachedPagesForDevice } from "@/pdf/memoryCalibration";
+import { computeRenderScale } from "@/pdf/renderScale";
 import PdfPage from "@/pdf/PdfPage";
 import FastScroller from "@/pdf/FastScroller";
 import TocSheet from "@/pdf/TocSheet";
@@ -25,7 +26,9 @@ import {
 import { antiCopyGuard } from "@/security/antiCopyGuard";
 import { visibilityGuard } from "@/security/visibilityGuard";
 import { devtoolsGuard } from "@/security/devtoolsGuard";
-import { IconButton, Spinner, TopAppBar } from "@/components";
+import { createPortal } from "react-dom";
+import { drawWatermark } from "@/security/watermark";
+import { Button, Card, IconButton, Spinner, TopAppBar } from "@/components";
 import {
   ArrowBack,
   Close,
@@ -35,6 +38,7 @@ import {
   KeyboardArrowDown,
   KeyboardArrowUp,
   PanTool,
+  Print,
   Search,
   Toc,
   Undo,
@@ -51,6 +55,7 @@ export default function PdfReaderScreen() {
   const navigate = useNavigate();
   const { findApostila, userProfile, loading: apostilasLoading } = useApostilas();
   const { user } = useAuth();
+  const watermarkText = user?.email ?? "";
   const { expirada } = useSubscription();
 
   const apostila = apostilaId ? findApostila(apostilaId) : undefined;
@@ -65,11 +70,17 @@ export default function PdfReaderScreen() {
   const [showToc, setShowToc] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [devtoolsSuspected, setDevtoolsSuspected] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printPages, setPrintPages] = useState<string[]>([]);
+  const [printProgress, setPrintProgress] = useState<{ current: number; total: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const abortPrintRef = useRef(false);
+  const printPagesRef = useRef<string[]>([]);
+  printPagesRef.current = printPages;
 
   useEffect(() => {
     if (apostilasLoading) return;
@@ -325,6 +336,148 @@ export default function PdfReaderScreen() {
     search.clear();
   }
 
+  const cleanupUrls = useCallback((list: string[]) => {
+    for (const url of list) URL.revokeObjectURL(url);
+  }, []);
+
+  const handleCancelPrint = useCallback(() => {
+    abortPrintRef.current = true;
+    setPrintProgress(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      abortPrintRef.current = true;
+      cleanupUrls(printPagesRef.current);
+    };
+  }, [cleanupUrls]);
+
+  const handlePrint = useCallback(async () => {
+    if (docState.status !== "ready" || isPrinting || printProgress !== null) return;
+
+    const total = docState.pageCount;
+    if (total <= 0) return;
+
+    abortPrintRef.current = false;
+    setPrintProgress({ current: 0, total });
+
+    const canvas = document.createElement("canvas");
+    const urls: string[] = [];
+
+    try {
+      for (let i = 0; i < total; i++) {
+        if (abortPrintRef.current) {
+          cleanupUrls(urls);
+          return;
+        }
+
+        setPrintProgress({ current: i + 1, total });
+
+        const page = await docState.doc.getPage(i + 1);
+        if (abortPrintRef.current) {
+          cleanupUrls(urls);
+          return;
+        }
+
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = computeRenderScale(baseViewport.width, baseViewport.height, 1600);
+        const viewport = page.getViewport({ scale });
+
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context unavailable");
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        if (abortPrintRef.current) {
+          cleanupUrls(urls);
+          return;
+        }
+
+        const pageStrokes = annotations.strokes[i];
+        if (pageStrokes && pageStrokes.length > 0) {
+          for (const stroke of pageStrokes) {
+            if (stroke.points.length < 2) continue;
+            ctx.beginPath();
+            ctx.moveTo(stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
+            for (const p of stroke.points.slice(1)) {
+              ctx.lineTo(p.x * canvas.width, p.y * canvas.height);
+            }
+            ctx.strokeStyle = stroke.color;
+            ctx.lineWidth = Math.max(1, stroke.width * (canvas.width / 800));
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.stroke();
+          }
+        }
+
+        if (watermarkText) {
+          drawWatermark(ctx, canvas.width, canvas.height, {
+            text: watermarkText,
+            padding: Math.max(24, Math.round(canvas.width * 0.03)),
+          });
+        }
+
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.92),
+        );
+        if (!blob) throw new Error("Print page generation failed");
+        if (abortPrintRef.current) {
+          cleanupUrls(urls);
+          return;
+        }
+
+        urls.push(URL.createObjectURL(blob));
+
+        await new Promise((r) => setTimeout(r, 0));
+      }
+
+      if (abortPrintRef.current) {
+        cleanupUrls(urls);
+        return;
+      }
+
+      cleanupUrls(printPagesRef.current);
+      setPrintPages(urls);
+      setIsPrinting(true);
+      setPrintProgress(null);
+
+      const finishPrinting = () => {
+        setIsPrinting(false);
+      };
+      window.addEventListener("afterprint", finishPrinting, { once: true });
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          try {
+            window.print();
+          } catch {
+            finishPrinting();
+          }
+          setTimeout(finishPrinting, 1500);
+        });
+      });
+    } catch {
+      cleanupUrls(urls);
+      setIsPrinting(false);
+      setPrintProgress(null);
+    }
+  }, [docState, isPrinting, printProgress, annotations.strokes, watermarkText, cleanupUrls]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        void handlePrint();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handlePrint]);
+
   if (negadoPeloServidor) {
     return <SubscriptionExpiredScreen />;
   }
@@ -364,8 +517,6 @@ export default function PdfReaderScreen() {
       </ReaderMessage>
     );
   }
-
-  const watermarkText = user?.email ?? "";
 
   return (
     <div style={styles.page}>
@@ -439,6 +590,13 @@ export default function PdfReaderScreen() {
                 <ZoomOutMap />
               </IconButton>
             )}
+            <IconButton
+              label="Imprimir"
+              onClick={() => void handlePrint()}
+              disabled={docState.status !== "ready" || printProgress !== null || isPrinting}
+            >
+              <Print />
+            </IconButton>
             <IconButton label="Buscar" onClick={() => setIsSearching(true)}>
               <Search />
             </IconButton>
@@ -531,8 +689,7 @@ export default function PdfReaderScreen() {
         />
       )}
 
-      {                                                                                   }
-      {hidden && (
+      {hidden && !isPrinting && !printProgress && (
         <div style={styles.privacyOverlay}>
           <p className="m3-body-large" style={{ color: "var(--md-on-surface-variant)" }}>Conteúdo oculto</p>
         </div>
@@ -543,6 +700,39 @@ export default function PdfReaderScreen() {
           Ferramentas de desenvolvedor detectadas — algumas proteções de conteúdo podem estar desativadas.
         </div>
       )}
+
+      {printProgress && (
+        <div className="m3-scrim" style={styles.printScrim}>
+          <Card variant="elevated" style={styles.printCard}>
+            <h2 className="m3-title-medium" style={styles.printTitle}>
+              Preparando impressão
+            </h2>
+            <Spinner size={36} />
+            <span className="m3-body-medium" style={styles.printSubtitle}>
+              Página {Math.max(1, printProgress.current)} de {printProgress.total}…
+            </span>
+            <Button variant="text" onClick={handleCancelPrint}>
+              Cancelar
+            </Button>
+          </Card>
+        </div>
+      )}
+
+      {printPages.length > 0 &&
+        createPortal(
+          <div id="print-portal">
+            {printPages.map((url, idx) => (
+              <div key={idx} className="print-page-container">
+                <img
+                  src={url}
+                  className="print-page"
+                  alt={`Página ${idx + 1}`}
+                />
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -626,5 +816,27 @@ const styles: Record<string, React.CSSProperties> = {
     padding: `10px 16px calc(10px + env(safe-area-inset-bottom, 0px))`,
     textAlign: "center",
     zIndex: "var(--z-banner)" as unknown as number,
+  },
+  printScrim: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: "var(--z-sheet)" as unknown as number,
+  },
+  printCard: {
+    width: "min(88vw, 340px)",
+    padding: "24px 20px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 16,
+    textAlign: "center",
+  },
+  printTitle: {
+    margin: 0,
+    color: "var(--md-on-surface)",
+  },
+  printSubtitle: {
+    color: "var(--md-on-surface-variant)",
   },
 };

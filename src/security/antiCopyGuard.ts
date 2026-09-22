@@ -1,5 +1,5 @@
 const BLOCKED_KEY_COMBOS: Array<(e: KeyboardEvent) => boolean> = [
-  (e) => (e.ctrlKey || e.metaKey) && ["c", "s", "p", "u"].includes(e.key.toLowerCase()),
+  (e) => (e.ctrlKey || e.metaKey) && ["c", "s", "u"].includes(e.key.toLowerCase()),
   (e) =>
     (e.ctrlKey || e.metaKey) &&
     e.shiftKey &&
