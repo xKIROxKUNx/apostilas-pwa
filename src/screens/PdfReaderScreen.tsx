@@ -361,7 +361,6 @@ export default function PdfReaderScreen() {
     abortPrintRef.current = false;
     setPrintProgress({ current: 0, total });
 
-    const canvas = document.createElement("canvas");
     const urls: string[] = [];
 
     try {
@@ -375,62 +374,73 @@ export default function PdfReaderScreen() {
 
         const page = await docState.doc.getPage(i + 1);
         if (abortPrintRef.current) {
+          page.cleanup();
           cleanupUrls(urls);
           return;
         }
 
-        const baseViewport = page.getViewport({ scale: 1 });
-        const scale = computeRenderScale(baseViewport.width, baseViewport.height, 1600);
-        const viewport = page.getViewport({ scale });
+        try {
+          const baseViewport = page.getViewport({ scale: 1 });
+          const scale = computeRenderScale(baseViewport.width, baseViewport.height, 1600);
+          const viewport = page.getViewport({ scale });
 
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas context unavailable");
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas context unavailable");
 
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        if (abortPrintRef.current) {
-          cleanupUrls(urls);
-          return;
-        }
-
-        const pageStrokes = annotations.strokes[i];
-        if (pageStrokes && pageStrokes.length > 0) {
-          for (const stroke of pageStrokes) {
-            if (stroke.points.length < 2) continue;
-            ctx.beginPath();
-            ctx.moveTo(stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
-            for (const p of stroke.points.slice(1)) {
-              ctx.lineTo(p.x * canvas.width, p.y * canvas.height);
-            }
-            ctx.strokeStyle = stroke.color;
-            ctx.lineWidth = Math.max(1, stroke.width * (canvas.width / 800));
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            ctx.stroke();
+          await page.render({ canvasContext: ctx, viewport, intent: "print" }).promise;
+          if (abortPrintRef.current) {
+            canvas.width = 0;
+            canvas.height = 0;
+            cleanupUrls(urls);
+            return;
           }
-        }
 
-        if (watermarkText) {
-          drawWatermark(ctx, canvas.width, canvas.height, {
-            text: watermarkText,
-            padding: Math.max(24, Math.round(canvas.width * 0.03)),
-          });
-        }
+          const pageStrokes = annotations.strokes[i];
+          if (pageStrokes && pageStrokes.length > 0) {
+            for (const stroke of pageStrokes) {
+              if (stroke.points.length < 2) continue;
+              ctx.beginPath();
+              ctx.moveTo(stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
+              for (const p of stroke.points.slice(1)) {
+                ctx.lineTo(p.x * canvas.width, p.y * canvas.height);
+              }
+              ctx.strokeStyle = stroke.color;
+              ctx.lineWidth = Math.max(1, stroke.width * (canvas.width / 800));
+              ctx.lineCap = "round";
+              ctx.lineJoin = "round";
+              ctx.stroke();
+            }
+          }
 
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", 0.92),
-        );
-        if (!blob) throw new Error("Print page generation failed");
-        if (abortPrintRef.current) {
-          cleanupUrls(urls);
-          return;
-        }
+          if (watermarkText) {
+            drawWatermark(ctx, canvas.width, canvas.height, {
+              text: watermarkText,
+              padding: Math.max(24, Math.round(canvas.width * 0.03)),
+            });
+          }
 
-        urls.push(URL.createObjectURL(blob));
+          const blob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.95),
+          );
+          canvas.width = 0;
+          canvas.height = 0;
+
+          if (!blob) throw new Error("Print page generation failed");
+          if (abortPrintRef.current) {
+            cleanupUrls(urls);
+            return;
+          }
+
+          urls.push(URL.createObjectURL(blob));
+        } finally {
+          page.cleanup();
+        }
 
         await new Promise((r) => setTimeout(r, 0));
       }
@@ -443,23 +453,56 @@ export default function PdfReaderScreen() {
       cleanupUrls(printPagesRef.current);
       setPrintPages(urls);
       setIsPrinting(true);
-      setPrintProgress(null);
 
       const finishPrinting = () => {
         setIsPrinting(false);
+        window.removeEventListener("afterprint", finishPrinting);
+        window.removeEventListener("focus", finishPrinting);
       };
       window.addEventListener("afterprint", finishPrinting, { once: true });
+      window.addEventListener("focus", finishPrinting, { once: true });
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          try {
-            window.print();
-          } catch {
-            finishPrinting();
+      await new Promise<void>((resolve) => {
+        let attempts = 0;
+        const checkReady = () => {
+          if (abortPrintRef.current) {
+            resolve();
+            return;
           }
-          setTimeout(finishPrinting, 1500);
-        });
+          attempts++;
+          const portal = document.getElementById("print-portal");
+          const imgs = portal ? Array.from(portal.querySelectorAll("img")) : [];
+          if (imgs.length === urls.length) {
+            Promise.all(
+              imgs.map((img) =>
+                img.complete && !("decode" in img)
+                  ? Promise.resolve()
+                  : img.decode().catch(() => {}),
+              ),
+            ).then(() => resolve());
+            return;
+          }
+          if (attempts > 120) {
+            resolve();
+            return;
+          }
+          requestAnimationFrame(checkReady);
+        };
+        requestAnimationFrame(checkReady);
       });
+
+      setPrintProgress(null);
+
+      if (abortPrintRef.current) {
+        finishPrinting();
+        return;
+      }
+
+      try {
+        window.print();
+      } catch {
+        finishPrinting();
+      }
     } catch {
       cleanupUrls(urls);
       setIsPrinting(false);
