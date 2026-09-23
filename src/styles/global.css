@@ -176,9 +176,10 @@ a {
 
   .print-page {
     display: block !important;
-    width: 100% !important;
+    width: auto !important;
     height: auto !important;
     max-width: 100% !important;
+    max-height: calc(100vh - 1px) !important;
     margin: 0 auto !important;
     padding: 0 !important;
     page-break-inside: avoid !important;

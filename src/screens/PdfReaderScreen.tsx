@@ -28,6 +28,7 @@ import { visibilityGuard } from "@/security/visibilityGuard";
 import { devtoolsGuard } from "@/security/devtoolsGuard";
 import { createPortal } from "react-dom";
 import { drawWatermark } from "@/security/watermark";
+import type { Stroke } from "@/types/domain";
 import { Button, Card, IconButton, Spinner, TopAppBar } from "@/components";
 import {
   ArrowBack,
@@ -46,6 +47,10 @@ import {
 } from "@/components/icons";
 
 const POSITION_SAVE_DEBOUNCE_MS = 500;
+
+const NO_STROKES: Stroke[] = [];
+
+const PRINT_RELEASE_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
 
 const READER_INK =
   getComputedStyle(document.documentElement).getPropertyValue("--reader-ink").trim() || "#d9453f";
@@ -78,7 +83,7 @@ export default function PdfReaderScreen() {
   const contentRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const abortPrintRef = useRef(false);
+  const printRunRef = useRef(0);
   const printPagesRef = useRef<string[]>([]);
   printPagesRef.current = printPages;
 
@@ -340,14 +345,38 @@ export default function PdfReaderScreen() {
     for (const url of list) URL.revokeObjectURL(url);
   }, []);
 
+  const disarmPrintReleaseRef = useRef<(() => void) | null>(null);
+
+  const releasePrintPages = useCallback(() => {
+    disarmPrintReleaseRef.current?.();
+    disarmPrintReleaseRef.current = null;
+    cleanupUrls(printPagesRef.current);
+    printPagesRef.current = [];
+    setPrintPages([]);
+  }, [cleanupUrls]);
+
+  const armPrintRelease = useCallback(() => {
+    disarmPrintReleaseRef.current?.();
+    const onInteraction = () => releasePrintPages();
+    for (const type of PRINT_RELEASE_EVENTS) {
+      window.addEventListener(type, onInteraction, { capture: true, passive: true });
+    }
+    disarmPrintReleaseRef.current = () => {
+      for (const type of PRINT_RELEASE_EVENTS) {
+        window.removeEventListener(type, onInteraction, { capture: true });
+      }
+    };
+  }, [releasePrintPages]);
+
   const handleCancelPrint = useCallback(() => {
-    abortPrintRef.current = true;
+    printRunRef.current++;
     setPrintProgress(null);
   }, []);
 
   useEffect(() => {
     return () => {
-      abortPrintRef.current = true;
+      printRunRef.current++;
+      disarmPrintReleaseRef.current?.();
       cleanupUrls(printPagesRef.current);
     };
   }, [cleanupUrls]);
@@ -358,14 +387,17 @@ export default function PdfReaderScreen() {
     const total = docState.pageCount;
     if (total <= 0) return;
 
-    abortPrintRef.current = false;
+    const run = ++printRunRef.current;
+    const aborted = () => printRunRef.current !== run;
+
+    releasePrintPages();
     setPrintProgress({ current: 0, total });
 
     const urls: string[] = [];
 
     try {
       for (let i = 0; i < total; i++) {
-        if (abortPrintRef.current) {
+        if (aborted()) {
           cleanupUrls(urls);
           return;
         }
@@ -373,7 +405,7 @@ export default function PdfReaderScreen() {
         setPrintProgress({ current: i + 1, total });
 
         const page = await docState.doc.getPage(i + 1);
-        if (abortPrintRef.current) {
+        if (aborted()) {
           page.cleanup();
           cleanupUrls(urls);
           return;
@@ -387,14 +419,14 @@ export default function PdfReaderScreen() {
           const canvas = document.createElement("canvas");
           canvas.width = Math.floor(viewport.width);
           canvas.height = Math.floor(viewport.height);
-          const ctx = canvas.getContext("2d");
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
           if (!ctx) throw new Error("Canvas context unavailable");
 
           ctx.fillStyle = "#ffffff";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
           await page.render({ canvasContext: ctx, viewport, intent: "print" }).promise;
-          if (abortPrintRef.current) {
+          if (aborted()) {
             canvas.width = 0;
             canvas.height = 0;
             cleanupUrls(urls);
@@ -432,7 +464,7 @@ export default function PdfReaderScreen() {
           canvas.height = 0;
 
           if (!blob) throw new Error("Print page generation failed");
-          if (abortPrintRef.current) {
+          if (aborted()) {
             cleanupUrls(urls);
             return;
           }
@@ -445,27 +477,19 @@ export default function PdfReaderScreen() {
         await new Promise((r) => setTimeout(r, 0));
       }
 
-      if (abortPrintRef.current) {
+      if (aborted()) {
         cleanupUrls(urls);
         return;
       }
 
-      cleanupUrls(printPagesRef.current);
+      printPagesRef.current = urls;
       setPrintPages(urls);
       setIsPrinting(true);
-
-      const finishPrinting = () => {
-        setIsPrinting(false);
-        window.removeEventListener("afterprint", finishPrinting);
-        window.removeEventListener("focus", finishPrinting);
-      };
-      window.addEventListener("afterprint", finishPrinting, { once: true });
-      window.addEventListener("focus", finishPrinting, { once: true });
 
       await new Promise<void>((resolve) => {
         let attempts = 0;
         const checkReady = () => {
-          if (abortPrintRef.current) {
+          if (aborted()) {
             resolve();
             return;
           }
@@ -475,9 +499,12 @@ export default function PdfReaderScreen() {
           if (imgs.length === urls.length) {
             Promise.all(
               imgs.map((img) =>
-                img.complete && !("decode" in img)
-                  ? Promise.resolve()
-                  : img.decode().catch(() => {}),
+                img.complete
+                  ? undefined
+                  : new Promise<void>((done) => {
+                      img.addEventListener("load", () => done(), { once: true });
+                      img.addEventListener("error", () => done(), { once: true });
+                    }),
               ),
             ).then(() => resolve());
             return;
@@ -491,12 +518,22 @@ export default function PdfReaderScreen() {
         requestAnimationFrame(checkReady);
       });
 
-      setPrintProgress(null);
-
-      if (abortPrintRef.current) {
-        finishPrinting();
+      if (aborted()) {
+        setIsPrinting(false);
+        releasePrintPages();
         return;
       }
+
+      setPrintProgress(null);
+
+      const finishPrinting = () => {
+        window.removeEventListener("afterprint", finishPrinting);
+        window.removeEventListener("focus", finishPrinting);
+        setIsPrinting(false);
+        if (!aborted()) armPrintRelease();
+      };
+      window.addEventListener("afterprint", finishPrinting);
+      window.addEventListener("focus", finishPrinting);
 
       try {
         window.print();
@@ -504,11 +541,23 @@ export default function PdfReaderScreen() {
         finishPrinting();
       }
     } catch {
-      cleanupUrls(urls);
-      setIsPrinting(false);
-      setPrintProgress(null);
+      if (printPagesRef.current === urls) releasePrintPages();
+      else cleanupUrls(urls);
+      if (!aborted()) {
+        setIsPrinting(false);
+        setPrintProgress(null);
+      }
     }
-  }, [docState, isPrinting, printProgress, annotations.strokes, watermarkText, cleanupUrls]);
+  }, [
+    docState,
+    isPrinting,
+    printProgress,
+    annotations.strokes,
+    watermarkText,
+    cleanupUrls,
+    releasePrintPages,
+    armPrintRelease,
+  ]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -685,7 +734,7 @@ export default function PdfReaderScreen() {
                   aspectRatio={docState.aspectRatios[pageIndex] ?? 0.77}
                   shouldRender={renderSet.has(pageIndex)}
                   isDrawingMode={isDrawingMode}
-                  strokes={annotations.strokes[pageIndex] ?? []}
+                  strokes={annotations.strokes[pageIndex] ?? NO_STROKES}
                   watermarkText={watermarkText}
                   highlights={search.highlightsForPageIndex(pageIndex)}
                   currentHighlight={search.currentHighlightForPage(pageIndex)}
