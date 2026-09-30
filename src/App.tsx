@@ -13,6 +13,7 @@ import { useSubscription } from "@/state/useSubscription";
 
 const PdfReaderScreen = lazy(() => import("@/screens/PdfReaderScreen"));
 const SimuladoScreen = lazy(() => import("@/screens/SimuladoScreen"));
+const LeituraScreen = lazy(() => import("@/screens/LeituraScreen"));
 
 function RequireSession({ children }: { children: React.ReactNode }) {
   const { sessionState } = useAuth();
@@ -78,6 +79,18 @@ function AppRoutes() {
             <RequireSubscription>
               <Suspense fallback={<RouteFallback />}>
                 <SimuladoScreen />
+              </Suspense>
+            </RequireSubscription>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/leitura/:apostilaId"
+        element={
+          <RequireSession>
+            <RequireSubscription>
+              <Suspense fallback={<RouteFallback />}>
+                <LeituraScreen />
               </Suspense>
             </RequireSubscription>
           </RequireSession>

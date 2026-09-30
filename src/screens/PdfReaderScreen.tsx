@@ -28,7 +28,7 @@ import { visibilityGuard } from "@/security/visibilityGuard";
 import { devtoolsGuard } from "@/security/devtoolsGuard";
 import { createPortal } from "react-dom";
 import { drawWatermark } from "@/security/watermark";
-import type { Stroke } from "@/types/domain";
+import { rotaDoConteudo, type Stroke } from "@/types/domain";
 import { Button, Card, IconButton, Spinner, TopAppBar } from "@/components";
 import {
   ArrowBack,
@@ -570,8 +570,8 @@ export default function PdfReaderScreen() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handlePrint]);
 
-  if (apostila?.tipo === "simulado") {
-    return <Navigate to={`/simulado/${apostila.id}`} replace />;
+  if (apostila && apostila.tipo !== "pdf") {
+    return <Navigate to={rotaDoConteudo(apostila)} replace />;
   }
 
   if (negadoPeloServidor) {

@@ -4,7 +4,7 @@ import { useAuth } from "@/state/AuthContext";
 import { useApostilas } from "@/state/ApostilasContext";
 import { useSubscription } from "@/state/useSubscription";
 import { DIAS_ALERTA, DIAS_AVISO, textoDiasRestantes } from "@/types/subscription";
-import { hasAccess, toRoleName, type Apostila } from "@/types/domain";
+import { hasAccess, rotaDoConteudo, toRoleName, type Apostila, type TipoConteudo } from "@/types/domain";
 import { canOpenApostilaAnyDevice } from "@/security/wasm/accessGuard";
 import { getOrCreateDeviceId } from "@/security/deviceId";
 import { toFriendlyMessage } from "@/firebase/errorMessages";
@@ -17,8 +17,14 @@ import {
   KeyboardArrowRight,
   Lock,
   Logout,
+  MenuBook,
   Quiz,
 } from "@/components/icons";
+
+const ROTULO_TIPO: Partial<Record<TipoConteudo, string>> = {
+  simulado: "Simulado interativo",
+  html: "Apostila dinâmica",
+};
 
 const CORES_MATERIA = [
   "var(--md-materia1)",
@@ -67,7 +73,7 @@ export default function HomeScreen() {
       setTimeout(() => setToast(null), 3000);
       return;
     }
-    navigate(apostila.tipo === "simulado" ? `/simulado/${apostila.id}` : `/apostila/${apostila.id}`);
+    navigate(rotaDoConteudo(apostila));
   }
 
   return (
@@ -220,9 +226,9 @@ function SubjectFolder({
                       <span className="m3-body-small" style={styles.apostilaRequirement}>
                         Assinatura {toRoleName(a.nivelRequerido)} necessária
                       </span>
-                    ) : a.tipo === "simulado" ? (
+                    ) : ROTULO_TIPO[a.tipo] ? (
                       <span className="m3-body-small" style={styles.apostilaRequirement}>
-                        Simulado interativo
+                        {ROTULO_TIPO[a.tipo]}
                       </span>
                     ) : null}
                   </span>
@@ -231,6 +237,8 @@ function SubjectFolder({
                       <Lock size={20} />
                     ) : a.tipo === "simulado" ? (
                       <Quiz size={20} />
+                    ) : a.tipo === "html" ? (
+                      <MenuBook size={20} />
                     ) : (
                       <KeyboardArrowRight size={20} />
                     )}

@@ -5,7 +5,7 @@ export interface UserProfile {
   assinaturaExpiraEm: Date | null;
 }
 
-export type TipoConteudo = "pdf" | "simulado";
+export type TipoConteudo = "pdf" | "simulado" | "html";
 
 export interface Apostila {
   id: string;
@@ -15,6 +15,16 @@ export interface Apostila {
   nivelRequerido: number;
   tipo: TipoConteudo;
   urlConteudo: string;
+}
+
+const ROTAS_CONTEUDO: Record<TipoConteudo, string> = {
+  pdf: "/apostila",
+  simulado: "/simulado",
+  html: "/leitura",
+};
+
+export function rotaDoConteudo(apostila: Pick<Apostila, "id" | "tipo">): string {
+  return `${ROTAS_CONTEUDO[apostila.tipo]}/${apostila.id}`;
 }
 
 export type AsyncResult<T> =

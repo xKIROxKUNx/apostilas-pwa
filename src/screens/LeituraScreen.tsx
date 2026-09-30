@@ -1,16 +1,33 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import "@fontsource/poppins/latin-300.css";
+import "@fontsource/poppins/latin-400.css";
+import "@fontsource/poppins/latin-500.css";
+import "@fontsource/poppins/latin-600.css";
+import "@fontsource/poppins/latin-700.css";
+import "@fontsource/poppins/latin-ext-300.css";
+import "@fontsource/poppins/latin-ext-400.css";
+import "@fontsource/poppins/latin-ext-500.css";
+import "@fontsource/poppins/latin-ext-600.css";
+import "@fontsource/poppins/latin-ext-700.css";
+import "@fontsource/lora/latin-400.css";
+import "@fontsource/lora/latin-400-italic.css";
+import "@fontsource/lora/latin-600.css";
+import "@fontsource/lora/latin-700.css";
+import "@fontsource/lora/latin-ext-400.css";
+import "@fontsource/lora/latin-ext-400-italic.css";
+import "@fontsource/lora/latin-ext-600.css";
+import "@fontsource/lora/latin-ext-700.css";
 import { useApostilas } from "@/state/ApostilasContext";
 import { useAuth } from "@/state/AuthContext";
 import SubscriptionExpiredScreen from "@/screens/SubscriptionExpiredScreen";
 import { CamadaPrivacidade, MensagemConteudo, useAcessoConteudo, useProtecaoConteudo } from "@/screens/conteudoProtegido";
-import { downloadSimulado } from "@/firebase/simuladoService";
+import { downloadApostilaHtml } from "@/firebase/apostilaHtmlService";
 import { isStorageDenied, toFriendlyMessage } from "@/firebase/errorMessages";
-import SimuladoApp from "@/simulado/SimuladoApp";
-import type { Simulado } from "@/simulado/types";
+import LeitorApostila from "@/apostila/LeitorApostila";
 import { rotaDoConteudo } from "@/types/domain";
 
-export default function SimuladoScreen() {
+export default function LeituraScreen() {
   const { apostilaId } = useParams<{ apostilaId: string }>();
   const navigate = useNavigate();
   const { findApostila } = useApostilas();
@@ -20,16 +37,16 @@ export default function SimuladoScreen() {
   const accessState = useAcessoConteudo(apostila);
   const oculto = useProtecaoConteudo();
 
-  const [simulado, setSimulado] = useState<Simulado | null>(null);
+  const [html, setHtml] = useState<string | null>(null);
   const [erro, setErro] = useState<Error | null>(null);
   const [negadoPeloServidor, setNegadoPeloServidor] = useState(false);
 
   useEffect(() => {
-    if (!apostila || apostila.tipo !== "simulado" || accessState !== "allowed") return;
+    if (!apostila || apostila.tipo !== "html" || accessState !== "allowed") return;
     let cancelled = false;
-    downloadSimulado(apostila.urlConteudo)
-      .then((dados) => {
-        if (!cancelled) setSimulado(dados);
+    downloadApostilaHtml(apostila.urlConteudo)
+      .then((texto) => {
+        if (!cancelled) setHtml(texto);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -46,7 +63,7 @@ export default function SimuladoScreen() {
 
   const voltar = () => navigate("/home");
 
-  if (apostila && apostila.tipo !== "simulado") {
+  if (apostila && apostila.tipo !== "html") {
     return <Navigate to={rotaDoConteudo(apostila)} replace />;
   }
 
@@ -59,7 +76,7 @@ export default function SimuladoScreen() {
   }
 
   if (!apostila) {
-    return <MensagemConteudo onBack={voltar}>Simulado não encontrado. Volte para a Home e tente novamente.</MensagemConteudo>;
+    return <MensagemConteudo onBack={voltar}>Apostila não encontrada. Volte para a Home e tente novamente.</MensagemConteudo>;
   }
 
   if (accessState === "denied") {
@@ -67,27 +84,27 @@ export default function SimuladoScreen() {
   }
 
   if (erro) {
-    return <MensagemConteudo onBack={voltar}>Erro ao carregar o simulado: {toFriendlyMessage(erro)}</MensagemConteudo>;
+    return <MensagemConteudo onBack={voltar}>Erro ao carregar a apostila: {toFriendlyMessage(erro)}</MensagemConteudo>;
   }
 
-  if (!simulado) {
+  if (html === null) {
     return (
       <MensagemConteudo onBack={voltar} carregando>
-        Carregando simulado…
+        Carregando apostila…
       </MensagemConteudo>
     );
   }
 
   return (
     <>
-      <SimuladoApp
+      <LeitorApostila
         titulo={apostila.titulo}
-        simulado={simulado}
+        html={html}
         escopoArmazenamento={`${user?.uid ?? "anon"}:${apostila.id}`}
         onSair={voltar}
       />
       {user?.email && (
-        <div className="sim-marca-dagua" aria-hidden>
+        <div className="ap-marca-dagua" aria-hidden>
           {user.email}
         </div>
       )}
