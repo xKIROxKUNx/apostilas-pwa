@@ -27,6 +27,7 @@ export interface QuestaoObjetiva {
   dificuldade: Dificuldade;
   tema: string;
   caso?: string;
+  casoRotulo?: string;
   enunciado: string;
   alternativas: Alternativa[];
   gabarito: Letra;
@@ -45,6 +46,7 @@ export interface QuestaoDiscursiva {
   dificuldade: Dificuldade;
   tema: string;
   caso?: string;
+  casoRotulo?: string;
   enunciado: string;
   referencia: string;
   espelho: CriterioEspelho[];

@@ -151,6 +151,8 @@ function converter(fonte) {
       const tema = textoPuro(primeiro(/<span class="tag">([\s\S]*?)<\/span>/, cab, ""));
       const casoBloco = blocosDiv(q.interno, "case")[0];
       const caso = casoBloco ? htmlLimpo(casoBloco.interno.replace(/<div class="lbl">[\s\S]*?<\/div>/, "")) : undefined;
+      const rotulo = casoBloco ? textoPuro(primeiro(/<div class="lbl">([\s\S]*?)<\/div>/, casoBloco.interno, "")) : "";
+      const casoRotulo = rotulo && !/^caso clínico$/i.test(rotulo) ? { casoRotulo: rotulo } : {};
       const enunciado = htmlLimpo(blocosDiv(q.interno, "stem")[0]?.interno ?? "");
 
       if (q.html.startsWith('<div class="q disc"')) {
@@ -159,7 +161,7 @@ function converter(fonte) {
           secao: sec.id,
           dificuldade: dificuldade(dif, numeroTexto),
           tema,
-          ...(caso ? { caso } : {}),
+          ...(caso ? { caso, ...casoRotulo } : {}),
           enunciado,
           referencia: "",
           espelho: [],
@@ -204,7 +206,7 @@ function converter(fonte) {
         secao: sec.id,
         dificuldade: difQuestao,
         tema,
-        ...(caso ? { caso } : {}),
+        ...(caso ? { caso, ...casoRotulo } : {}),
         enunciado,
         alternativas,
         gabarito: linha.letra,

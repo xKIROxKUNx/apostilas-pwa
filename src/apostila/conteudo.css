@@ -282,6 +282,13 @@
 .ap-raiz[data-tema="escuro"] .deep { background: #2a2336; color: #e6dcf2; }
 .ap-raiz[data-tema="escuro"] .deep .box-title { color: #c3a8e6; }
 
+.ap-raiz[data-tema="escuro"] .med { background: #1e2638; color: #d9e2f2; }
+.ap-raiz[data-tema="escuro"] .med .box-title,
+.ap-raiz[data-tema="escuro"] .med .lbl { color: #a9bde6; }
+
+.ap-raiz[data-tema="escuro"] .doc { background: #2e2a1c; color: #ece3c7; }
+.ap-raiz[data-tema="escuro"] .doc .box-title { color: #d8c07a; }
+
 .ap-raiz[data-tema="escuro"] .tag { background: var(--escuro-caixa, #243242); color: var(--escuro-destaque, #cfe0f5); }
 .ap-raiz[data-tema="escuro"] .tag.alt { background: #3a2222; color: #f2c4c1; }
 

@@ -68,7 +68,7 @@ export default function QuestaoObjetivaView({
 
       {questao.caso && (
         <div className="sim-caso">
-          <span className="sim-caso__rotulo m3-label-medium">Caso clínico</span>
+          <span className="sim-caso__rotulo m3-label-medium">{questao.casoRotulo ?? "Caso clínico"}</span>
           <RichText className="sim-texto m3-body-medium" html={questao.caso} />
         </div>
       )}
