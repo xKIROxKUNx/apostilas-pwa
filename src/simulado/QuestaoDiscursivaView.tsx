@@ -39,7 +39,7 @@ export default function QuestaoDiscursivaView({
         <span className="m3-title-medium">Discursiva {questao.id}</span>
         <ChipDificuldade dificuldade={questao.dificuldade} />
         <span className="sim-chip sim-chip--neutro">{questao.pontos} pontos</span>
-        <span className="m3-body-small sim-muted">{questao.tema}</span>
+        {podeCorrigir && mostrarEspelho && <span className="m3-body-small sim-muted">{questao.tema}</span>}
       </div>
 
       {questao.caso && (

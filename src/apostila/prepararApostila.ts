@@ -24,6 +24,54 @@ function colunas(tabela: HTMLTableElement): number {
   return Array.from(linha.cells).reduce((soma, c) => soma + (c.colSpan || 1), 0);
 }
 
+const PREFIXO_CASO = /^\s*(\d+)\s*·\s*/;
+
+function distribuirPerguntas(doc: Document) {
+  const capitulos = new Map<number, Element>();
+  for (const h1 of Array.from(doc.body.querySelectorAll(".cap > h1"))) {
+    const numero = (h1.querySelector(".num")?.textContent ?? "").trim();
+    if (/^\d+$/.test(numero) && h1.parentElement) capitulos.set(parseInt(numero, 10), h1.parentElement);
+  }
+  if (capitulos.size === 0) return;
+
+  const grupos = new Map<Element, Element[]>();
+  const origens = new Set<Element>();
+  for (const cartao of Array.from(doc.body.querySelectorAll(".f.qa"))) {
+    const pergunta = cartao.firstElementChild;
+    const texto = pergunta?.firstChild;
+    const achado = texto?.nodeType === Node.TEXT_NODE ? (texto.textContent ?? "").match(PREFIXO_CASO) : null;
+    const destino = achado ? capitulos.get(parseInt(achado[1], 10)) : undefined;
+    if (!texto || !destino || destino.contains(cartao)) continue;
+    texto.textContent = (texto.textContent ?? "").replace(PREFIXO_CASO, "");
+    if (cartao.parentElement) origens.add(cartao.parentElement);
+    grupos.set(destino, [...(grupos.get(destino) ?? []), cartao]);
+  }
+
+  for (const [capitulo, cartoes] of grupos) {
+    const titulo = doc.createElement("h2");
+    titulo.textContent = "Perguntas-relâmpago";
+    const guia = doc.createElement("p");
+    guia.className = "small";
+    guia.textContent = "Teste o que ficou deste capítulo: responda de cabeça antes de tocar no cartão.";
+    const bloco = doc.createElement("div");
+    bloco.className = "flash";
+    bloco.append(...cartoes);
+    capitulo.append(titulo, guia, bloco);
+  }
+
+  for (const origem of origens) {
+    if (origem.children.length > 0) continue;
+    let anterior = origem.previousElementSibling;
+    origem.remove();
+    if (anterior?.matches("p.small")) {
+      const antes = anterior.previousElementSibling;
+      anterior.remove();
+      anterior = antes;
+    }
+    if (anterior?.tagName === "H2") anterior.remove();
+  }
+}
+
 function textoDoTitulo(el: Element): string {
   const copia = el.cloneNode(true) as Element;
   copia.querySelectorAll(".ref").forEach((r) => r.remove());
@@ -54,6 +102,8 @@ export function prepararApostila(html: string): ApostilaPreparada {
       a.removeAttribute("href");
     }
   }
+
+  distribuirPerguntas(doc);
 
   for (const tabela of Array.from(doc.body.querySelectorAll("table"))) {
     const caixa = doc.createElement("div");

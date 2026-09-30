@@ -40,6 +40,18 @@ interface TituloMedido {
   topo: number;
 }
 
+function ajustarTitulosCapa(raiz: HTMLElement) {
+  for (const titulo of Array.from(raiz.querySelectorAll<HTMLElement>(".cover .title"))) {
+    titulo.style.fontSize = "";
+    let tamanho = parseFloat(getComputedStyle(titulo).fontSize);
+    const minimo = tamanho * 0.45;
+    while (titulo.scrollWidth > titulo.clientWidth + 1 && tamanho > minimo) {
+      tamanho *= 0.92;
+      titulo.style.fontSize = `${tamanho}px`;
+    }
+  }
+}
+
 function lerEscala(): number {
   try {
     const valor = Number(localStorage.getItem(CHAVE_ESCALA));
@@ -179,9 +191,11 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
     const raiz = preparado.raiz;
     raiz.style.zoom = String(zoom);
     raiz.style.setProperty("--ap-escala", String(escala));
+    raiz.style.setProperty("--ap-escala-inversa", String(1 / escala));
     raiz.dataset.tema = resolved === "dark" ? "escuro" : "claro";
     const efetiva = Math.min(larguraRolagem / zoom, LARGURA_MAX_CONTEUDO);
     raiz.dataset.largura = efetiva < 460 ? "estreita" : efetiva < 680 ? "media" : "larga";
+    ajustarTitulosCapa(raiz);
     const pendente = restaurarRef.current;
     if (pendente) {
       restaurarRef.current = null;
@@ -216,6 +230,7 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
       const salvo = await getReadingPosition(escopoPosicao);
       await Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 1500))]);
       if (cancelado) return;
+      ajustarTitulosCapa(preparado.raiz);
       if (salvo) restaurar({ indice: salvo.pageIndex, fracao: salvo.fraction });
       restauradoRef.current = true;
       ultimaPosicaoRef.current = posicaoAtual();
@@ -225,7 +240,7 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
     return () => {
       cancelado = true;
     };
-  }, [zoomBase, escopoPosicao, restaurar, posicaoAtual, medir]);
+  }, [zoomBase, escopoPosicao, preparado, restaurar, posicaoAtual, medir]);
 
   const salvarPosicao = useCallback(() => {
     if (!restauradoRef.current) return;

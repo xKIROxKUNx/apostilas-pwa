@@ -53,7 +53,7 @@ export default function QuestaoObjetivaView({
       <div className="sim-questao__meta">
         <span className="m3-title-medium">Questão {questao.numero}</span>
         <ChipDificuldade dificuldade={questao.dificuldade} />
-        <span className="m3-body-small sim-muted">{questao.tema}</span>
+        {revelado && <span className="m3-body-small sim-muted">{questao.tema}</span>}
       </div>
 
       {secao?.casoIntegrado && (
