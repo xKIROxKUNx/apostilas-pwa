@@ -11,6 +11,8 @@ public/wasm/*.wasm.map
 .env.*.local
 
 scripts/*.py
+
+/conteudo/
 __pycache__/
 
 .claude/

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useApostilas } from "@/state/ApostilasContext";
 import { useAuth } from "@/state/AuthContext";
 import { useSubscription } from "@/state/useSubscription";
@@ -110,7 +110,7 @@ export default function PdfReaderScreen() {
   }, [apostila, userProfile, apostilasLoading, expirada]);
 
   useEffect(() => {
-    if (!apostila || accessState !== "allowed") return;
+    if (!apostila || apostila.tipo !== "pdf" || accessState !== "allowed") return;
     let cancelled = false;
     downloadPdfBytes(apostila.urlPdf)
       .then((bytes) => {
@@ -569,6 +569,10 @@ export default function PdfReaderScreen() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handlePrint]);
+
+  if (apostila?.tipo === "simulado") {
+    return <Navigate to={`/simulado/${apostila.id}`} replace />;
+  }
 
   if (negadoPeloServidor) {
     return <SubscriptionExpiredScreen />;

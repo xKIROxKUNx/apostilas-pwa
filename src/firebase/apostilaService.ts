@@ -12,6 +12,8 @@ export async function getApostilas(): Promise<Apostila[]> {
       componenteCurricular: data.componente_curricular ?? "Sem componente curricular",
       urlPdf: data.url_pdf ?? "",
       nivelRequerido: typeof data.nivel_requerido === "number" ? data.nivel_requerido : 1,
+      tipo: data.tipo === "simulado" ? "simulado" : "pdf",
+      urlConteudo: data.url_conteudo ?? "",
     } satisfies Apostila;
   });
 }

@@ -12,6 +12,7 @@ import { ApostilasProvider, useApostilas } from "@/state/ApostilasContext";
 import { useSubscription } from "@/state/useSubscription";
 
 const PdfReaderScreen = lazy(() => import("@/screens/PdfReaderScreen"));
+const SimuladoScreen = lazy(() => import("@/screens/SimuladoScreen"));
 
 function RequireSession({ children }: { children: React.ReactNode }) {
   const { sessionState } = useAuth();
@@ -65,6 +66,18 @@ function AppRoutes() {
             <RequireSubscription>
               <Suspense fallback={<RouteFallback />}>
                 <PdfReaderScreen />
+              </Suspense>
+            </RequireSubscription>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/simulado/:apostilaId"
+        element={
+          <RequireSession>
+            <RequireSubscription>
+              <Suspense fallback={<RouteFallback />}>
+                <SimuladoScreen />
               </Suspense>
             </RequireSubscription>
           </RequireSession>

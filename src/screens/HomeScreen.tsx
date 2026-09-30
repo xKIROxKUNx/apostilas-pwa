@@ -17,6 +17,7 @@ import {
   KeyboardArrowRight,
   Lock,
   Logout,
+  Quiz,
 } from "@/components/icons";
 
 const CORES_MATERIA = [
@@ -66,7 +67,7 @@ export default function HomeScreen() {
       setTimeout(() => setToast(null), 3000);
       return;
     }
-    navigate(`/apostila/${apostila.id}`);
+    navigate(apostila.tipo === "simulado" ? `/simulado/${apostila.id}` : `/apostila/${apostila.id}`);
   }
 
   return (
@@ -215,14 +216,24 @@ function SubjectFolder({
                     <span className="m3-body-large" style={styles.apostilaTitle}>
                       {a.titulo}
                     </span>
-                    {locked && (
+                    {locked ? (
                       <span className="m3-body-small" style={styles.apostilaRequirement}>
                         Assinatura {toRoleName(a.nivelRequerido)} necessária
                       </span>
-                    )}
+                    ) : a.tipo === "simulado" ? (
+                      <span className="m3-body-small" style={styles.apostilaRequirement}>
+                        Simulado interativo
+                      </span>
+                    ) : null}
                   </span>
                   <span style={{ color: locked ? "var(--md-error)" : color, display: "flex" }}>
-                    {locked ? <Lock size={20} /> : <KeyboardArrowRight size={20} />}
+                    {locked ? (
+                      <Lock size={20} />
+                    ) : a.tipo === "simulado" ? (
+                      <Quiz size={20} />
+                    ) : (
+                      <KeyboardArrowRight size={20} />
+                    )}
                   </span>
                 </button>
               );

@@ -8,6 +8,10 @@ const BLOCKED_KEY_COMBOS: Array<(e: KeyboardEvent) => boolean> = [
   (e) => e.key === "PrintScreen",
 ];
 
+function isEditable(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea") !== null);
+}
+
 export interface AntiCopyOptions {
   onSuspectedScreenshot?: () => void;
   root?: HTMLElement;
@@ -45,6 +49,7 @@ class AntiCopyGuard {
   }
 
   private handleContextMenu = (e: MouseEvent): void => {
+    if (isEditable(e.target)) return;
     e.preventDefault();
   };
 
@@ -53,6 +58,7 @@ class AntiCopyGuard {
   };
 
   private handleSelectStart = (e: Event): void => {
+    if (isEditable(e.target)) return;
     e.preventDefault();
   };
 

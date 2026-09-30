@@ -87,6 +87,12 @@ a {
   user-select: none;
 }
 
+.no-select input,
+.no-select textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .no-callout {
   -webkit-touch-callout: none;
 }

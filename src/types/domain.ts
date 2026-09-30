@@ -5,12 +5,16 @@ export interface UserProfile {
   assinaturaExpiraEm: Date | null;
 }
 
+export type TipoConteudo = "pdf" | "simulado";
+
 export interface Apostila {
   id: string;
   titulo: string;
   componenteCurricular: string;
   urlPdf: string;
   nivelRequerido: number;
+  tipo: TipoConteudo;
+  urlConteudo: string;
 }
 
 export type AsyncResult<T> =
