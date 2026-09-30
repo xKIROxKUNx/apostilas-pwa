@@ -157,7 +157,7 @@ export function calcularResultado(simulado: Simulado, tentativa: Tentativa): Res
 
 export function descreverReferencia(referencia: string): string {
   const [caso, capitulo] = referencia.split("·").map((p) => p.trim());
-  if (!capitulo) return referencia;
+  if (!capitulo) return /^\d/.test(caso) ? `${/[–,-]/.test(caso) ? "Capítulos" : "Capítulo"} ${caso}` : referencia;
   const plural = /[–,-]/.test(capitulo);
   return `Caso ${caso} · ${plural ? "caps." : "cap."} ${capitulo}`;
 }

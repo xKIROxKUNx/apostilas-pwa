@@ -60,6 +60,7 @@ export function parseSimulado(dados: unknown): Simulado {
     minutosPorObjetiva: typeof dados.minutosPorObjetiva === "number" ? dados.minutosPorObjetiva : 2,
     minutosPorDiscursiva: typeof dados.minutosPorDiscursiva === "number" ? dados.minutosPorDiscursiva : 10,
     limiarPontoFraco: typeof dados.limiarPontoFraco === "number" ? dados.limiarPontoFraco : 60,
+    agrupamento: dados.agrupamento === "capitulo" ? "capitulo" : "caso",
     orientacaoCorrecao: textoOuNulo(dados.orientacaoCorrecao),
     orientacaoGabarito: textoOuNulo(dados.orientacaoGabarito),
     orientacaoEspelho: textoOuNulo(dados.orientacaoEspelho),

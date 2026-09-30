@@ -70,7 +70,7 @@ export default function SimuladoInicio({
     }
 
     lista.push({
-      grupo: "Por caso",
+      grupo: simulado.agrupamento === "caso" ? "Por caso" : "Por capítulo",
       itens: simulado.secoes.map((s) => ({
         chave: `secao:${s.id}`,
         escopo: { tipo: "secao", id: s.id },

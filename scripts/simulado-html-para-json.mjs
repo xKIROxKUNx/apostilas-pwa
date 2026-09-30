@@ -83,6 +83,10 @@ function intervalo(texto) {
   return numeros;
 }
 
+function cabecalhos(fonte) {
+  return [...fonte.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((m) => textoPuro(m[1]));
+}
+
 function caixa(fonte, rotulo) {
   for (const bx of blocosDiv(fonte, "bx info").concat(blocosDiv(fonte, "bx warn"))) {
     const lbl = primeiro(/<div class="lbl">([\s\S]*?)<\/div>/, bx.interno, "");
@@ -118,6 +122,7 @@ function converter(fonte) {
   );
 
   const secoes = [];
+  const numerosLidos = [];
   const objetivas = [];
   const discursivas = [];
 
@@ -170,6 +175,9 @@ function converter(fonte) {
       );
       const letras = alternativas.map((a) => a.letra).join("");
       if (letras !== LETRAS.join("")) erros.push(`${onde}: alternativas encontradas "${letras}", esperado "ABCDE"`);
+      const textos = alternativas.map((a) => textoPuro(a.texto).toLowerCase());
+      if (new Set(textos).size !== textos.length) erros.push(`${onde}: alternativas repetidas`);
+      numerosLidos.push(numero);
 
       const linha = linhasGabarito.get(numero);
       if (!linha) {
@@ -215,7 +223,7 @@ function converter(fonte) {
       erros.push(`Espelho ${id}: não corresponde a nenhuma discursiva`);
       continue;
     }
-    disc.referencia = textoPuro(primeiro(/Caso·cap\.\s*([^<]+)/, h3, ""));
+    disc.referencia = textoPuro(primeiro(/(?:Caso·)?cap\.\s*([^<]+)/i, h3, ""));
     disc.espelho = [...esp.interno.matchAll(/<tr><td>([\s\S]*?)<\/td><td class="pts">([^<]+)<\/td><\/tr>/g)].map((m) => ({
       texto: htmlLimpo(m[1]),
       pontos: Number(m[2].replace(",", ".")),
@@ -228,6 +236,7 @@ function converter(fonte) {
   }
 
   const diagHtml = secaoPorId.get("diag")?.interno ?? "";
+  const agrupamento = /caso/i.test(cabecalhos(diagHtml)[0] ?? cabecalhos(gabaritoHtml)[3] ?? "") ? "caso" : "capitulo";
   const diagnostico = [];
   const reDiag = /<tr><td><b>([\s\S]*?)<\/b><\/td><td>([\s\S]*?)<\/td><td class="c">(\d+)<\/td><td>([\s\S]*?)<\/td>/g;
   for (const m of diagHtml.matchAll(reDiag)) {
@@ -239,7 +248,7 @@ function converter(fonte) {
       id,
       titulo: resto.join(" · ") || rotulo,
       objetivas: nums,
-      discursivas: textoPuro(m[4]).split(",").map((d) => d.trim()).filter(Boolean),
+      discursivas: textoPuro(m[4]).split(",").map((d) => d.trim()).filter((d) => /\w/.test(d)),
     });
   }
   if (diagnostico.length > 0) {
@@ -247,7 +256,7 @@ function converter(fonte) {
     for (const g of diagnostico) for (const n of g.objetivas) contagem.set(n, (contagem.get(n) ?? 0) + 1);
     for (const q of objetivas) {
       const c = contagem.get(q.numero) ?? 0;
-      if (c !== 1) erros.push(`Questão ${q.numero}: aparece ${c} vez(es) no diagnóstico por caso`);
+      if (c !== 1) erros.push(`Questão ${q.numero}: aparece ${c} vez(es) no diagnóstico por ${agrupamento === "caso" ? "caso" : "capítulo"}`);
     }
   }
 
@@ -276,6 +285,22 @@ function converter(fonte) {
   if (linhasGabarito.size !== objetivas.length) {
     avisos.push(`Gabarito comentado tem ${linhasGabarito.size} linhas para ${objetivas.length} questões`);
   }
+  const foraDeOrdem = numerosLidos.findIndex((n, i) => n !== i + 1);
+  if (foraDeOrdem !== -1) {
+    avisos.push(
+      foraDeOrdem === 0
+        ? `A numeração começa em ${numerosLidos[0]}, e não em 1`
+        : `Numeração fora de sequência: depois da questão ${numerosLidos[foraDeOrdem - 1]} vem a ${numerosLidos[foraDeOrdem]}`,
+    );
+  }
+  if (objetivas.length >= 20) {
+    const porLetra = new Map(LETRAS.map((l) => [l, 0]));
+    for (const q of objetivas) porLetra.set(q.gabarito, porLetra.get(q.gabarito) + 1);
+    const desequilibradas = [...porLetra].filter(([, n]) => n / objetivas.length > 0.3 || n / objetivas.length < 0.1);
+    if (desequilibradas.length > 0) {
+      avisos.push(`Respostas mal distribuídas: ${desequilibradas.map(([l, n]) => `${l} = ${n}`).join(", ")} (ideal: cerca de ${Math.round(objetivas.length / 5)} por letra)`);
+    }
+  }
 
   return {
     versao: 1,
@@ -284,6 +309,7 @@ function converter(fonte) {
     minutosPorObjetiva,
     minutosPorDiscursiva,
     limiarPontoFraco: 60,
+    agrupamento,
     orientacaoCorrecao: caixa(instr, "correção"),
     orientacaoGabarito: caixa(gabaritoHtml, "confira"),
     orientacaoEspelho: caixa(espelhoHtml, "como corrigir"),
@@ -307,10 +333,14 @@ const saida = iSaida !== -1 ? args[iSaida + 1] : join(dirname(entrada), basename
 
 const simulado = converter(readFileSync(entrada, "utf8"));
 const porDificuldade = simulado.objetivas.reduce((acc, q) => ({ ...acc, [q.dificuldade]: (acc[q.dificuldade] ?? 0) + 1 }), {});
+const porLetra = LETRAS.map((l) => `${l} ${simulado.objetivas.filter((q) => q.gabarito === l).length}`).join(" · ");
+const comCaso = simulado.objetivas.filter((q) => q.caso || simulado.secoes.find((s) => s.id === q.secao)?.casoIntegrado).length;
 
 console.log(`Simulado: ${simulado.titulo}`);
 console.log(`  seções: ${simulado.secoes.length} | objetivas: ${simulado.objetivas.length} | discursivas: ${simulado.discursivas.length}`);
-console.log(`  dificuldade: ${JSON.stringify(porDificuldade)} | grupos de diagnóstico: ${simulado.diagnostico.length} | blocos: ${simulado.blocos.length}`);
+console.log(`  dificuldade: ${JSON.stringify(porDificuldade)} | com caso clínico: ${comCaso}`);
+console.log(`  respostas: ${porLetra}`);
+console.log(`  diagnóstico por ${simulado.agrupamento === "caso" ? "caso" : "capítulo"}: ${simulado.diagnostico.length} grupos | blocos: ${simulado.blocos.length}`);
 for (const a of avisos) console.log(`  aviso: ${a}`);
 for (const e of erros) console.error(`  ERRO: ${e}`);
 

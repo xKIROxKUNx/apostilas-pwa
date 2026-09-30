@@ -25,6 +25,7 @@ export default function SimuladoResultado({
   const temObjetivas = r.objetivas.total > 0;
   const prioritarios = r.capitulosComErro.filter((c) => c.erros >= 2);
   const isolados = r.capitulosComErro.length - prioritarios.length;
+  const porCaso = simulado.agrupamento === "caso";
   const pendentes = r.discursivas.total - r.discursivas.corrigidas;
 
   return (
@@ -63,7 +64,7 @@ export default function SimuladoResultado({
 
       {r.porGrupo.length > 0 && (
         <Card variant="filled" className="sim-card">
-          <p className="m3-title-small">Por caso</p>
+          <p className="m3-title-small">{porCaso ? "Por caso" : "Por capítulo"}</p>
           {r.porGrupo.map((g) => {
             const fraca = porcentagem(g.placar) < simulado.limiarPontoFraco;
             return (
@@ -77,16 +78,16 @@ export default function SimuladoResultado({
             );
           })}
           <p className="m3-body-small sim-muted">
-            Abaixo de {simulado.limiarPontoFraco}% (em vermelho) é o ponto fraco prioritário: releia a apostila inteira
-            desse caso, não só as questões.
+            Abaixo de {simulado.limiarPontoFraco}% (em vermelho) é o ponto fraco prioritário: releia{" "}
+            {porCaso ? "a apostila inteira desse caso" : "o capítulo inteiro"}, não só as questões.
           </p>
         </Card>
       )}
 
       {r.parteI.total > 0 && r.parteII.total > 0 && (
         <Card variant="filled" className="sim-card">
-          <p className="m3-title-small">Casos isolados × integrados</p>
-          <LinhaPlacar rotulo="Parte I · por caso" placar={r.parteI} />
+          <p className="m3-title-small">{porCaso ? "Casos isolados × integrados" : "Capítulos × casos integrados"}</p>
+          <LinhaPlacar rotulo={porCaso ? "Parte I · por caso" : "Parte I · por capítulo"} placar={r.parteI} />
           <LinhaPlacar rotulo="Parte II · casos integrados" placar={r.parteII} />
           {simulado.orientacaoPosCorrecao && (
             <RichText className="sim-texto m3-body-small sim-muted" html={simulado.orientacaoPosCorrecao} />

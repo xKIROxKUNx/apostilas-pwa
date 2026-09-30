@@ -1,6 +1,7 @@
 export type Letra = "A" | "B" | "C" | "D" | "E";
 export type Dificuldade = "facil" | "media" | "dificil";
 export type Parte = "I" | "II" | "III";
+export type Agrupamento = "caso" | "capitulo";
 
 export interface CasoIntegrado {
   titulo: string;
@@ -72,6 +73,7 @@ export interface Simulado {
   minutosPorObjetiva: number;
   minutosPorDiscursiva: number;
   limiarPontoFraco: number;
+  agrupamento: Agrupamento;
   orientacaoCorrecao: string | null;
   orientacaoGabarito: string | null;
   orientacaoEspelho: string | null;
