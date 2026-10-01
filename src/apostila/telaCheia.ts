@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { motorWebKit } from "./motor";
 
 const LIMIAR_BARRA_PX = 24;
 const JANELA_INTERACAO_MS = 1000;
@@ -6,7 +7,10 @@ const ALVOS_INTERATIVOS = "button, a, input, textarea, select, [role='slider']";
 
 function paisagem(): boolean {
   const tipo = screen.orientation?.type;
-  return tipo ? tipo.startsWith("landscape") : matchMedia("(orientation: landscape)").matches;
+  if (tipo) return tipo.startsWith("landscape");
+  const angulo = (window as { orientation?: unknown }).orientation;
+  if (typeof angulo === "number") return Math.abs(angulo) === 90;
+  return matchMedia("(orientation: landscape)").matches;
 }
 
 function toque(): boolean {
@@ -29,10 +33,12 @@ export function useTelaCheiaNaPaisagem(aoVoltar: () => void): boolean {
   useEffect(() => {
     if (!toque()) return;
     const disponivel = telaCheiaDisponivel();
+    const voltarSaiDaTelaCheia = !motorWebKit();
     let saindo = false;
     let interrompido = false;
+    let dispensado = false;
 
-    const atualizar = () => setImersivo(emTelaCheia() || (!disponivel && paisagem()));
+    const atualizar = () => setImersivo(emTelaCheia() || paisagem());
 
     const entrar = () => {
       if (!disponivel || emTelaCheia() || document.visibilityState !== "visible") return;
@@ -48,8 +54,12 @@ export function useTelaCheiaNaPaisagem(aoVoltar: () => void): boolean {
     };
 
     const aoGirar = () => {
-      if (paisagem()) entrar();
-      else sair();
+      if (paisagem()) {
+        dispensado = false;
+        entrar();
+      } else {
+        sair();
+      }
       atualizar();
     };
 
@@ -60,7 +70,8 @@ export function useTelaCheiaNaPaisagem(aoVoltar: () => void): boolean {
       } else if (saindo) {
         saindo = false;
       } else if (!interrompido && document.visibilityState === "visible" && paisagem()) {
-        aoVoltarRef.current();
+        if (voltarSaiDaTelaCheia) aoVoltarRef.current();
+        else dispensado = true;
       }
       atualizar();
     };
@@ -73,12 +84,12 @@ export function useTelaCheiaNaPaisagem(aoVoltar: () => void): boolean {
       if (document.visibilityState === "hidden") interromper();
     };
 
-    const aoTocar = (e: PointerEvent) => {
+    const aoTocar = (e: MouseEvent) => {
       if (emTelaCheia()) {
         interrompido = false;
         return;
       }
-      if (!paisagem() || (e.target instanceof Element && e.target.closest(ALVOS_INTERATIVOS))) return;
+      if (dispensado || !paisagem() || (e.target instanceof Element && e.target.closest(ALVOS_INTERATIVOS))) return;
       entrar();
     };
 
@@ -89,7 +100,8 @@ export function useTelaCheiaNaPaisagem(aoVoltar: () => void): boolean {
     document.addEventListener("visibilitychange", aoMudarVisibilidade);
     window.addEventListener("blur", interromper);
     window.addEventListener("beforeprint", interromper);
-    window.addEventListener("pointerup", aoTocar, true);
+    window.addEventListener("click", aoTocar, true);
+    window.addEventListener("resize", atualizar);
 
     if (paisagem()) entrar();
     atualizar();
@@ -101,7 +113,8 @@ export function useTelaCheiaNaPaisagem(aoVoltar: () => void): boolean {
       document.removeEventListener("visibilitychange", aoMudarVisibilidade);
       window.removeEventListener("blur", interromper);
       window.removeEventListener("beforeprint", interromper);
-      window.removeEventListener("pointerup", aoTocar, true);
+      window.removeEventListener("click", aoTocar, true);
+      window.removeEventListener("resize", atualizar);
       sair();
     };
   }, []);
@@ -135,6 +148,7 @@ export function useBarraRecolhivel(rolagemRef: RefObject<HTMLElement | null>, at
         setOculta(false);
         return;
       }
+      if (topo > r.scrollHeight - r.clientHeight) return;
       if (performance.now() - interagiuEm > JANELA_INTERACAO_MS) {
         acumulado = 0;
         return;

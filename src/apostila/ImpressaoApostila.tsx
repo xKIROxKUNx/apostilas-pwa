@@ -2,17 +2,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import cssImpressao from "./impressao.css?inline";
 import { prepararImpressao } from "./prepararApostila";
+import { motorWebKit } from "./motor";
 
 const TITULAR = "Pedro Lucas Oliveira Cerqueira";
 const PRIMEIRO_ANO = 2026;
 const PAGINA_BASE = "@page { size: A4; margin: 15mm; }";
 const PAGINA_FINAL =
   "@page { size: A4; }\n@page ap-creditos { @top-left { content: none; } @top-center { content: none; } @top-right { content: none; } }";
-
-function motorWebKit(): boolean {
-  const ua = navigator.userAgent;
-  return /AppleWebKit/.test(ua) && !/(Chrome|Chromium|Edg|OPR|Firefox)\//.test(ua);
-}
 
 function hoje(): string {
   return new Date().toLocaleDateString("pt-BR");
