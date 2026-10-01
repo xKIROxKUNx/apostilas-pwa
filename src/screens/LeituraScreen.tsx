@@ -125,6 +125,7 @@ export default function LeituraScreen() {
         html={html}
         escopoArmazenamento={`${user?.uid ?? "anon"}:${apostila.id}`}
         imersivo={imersivo}
+        marcaDagua={user?.email ?? undefined}
         onSair={voltar}
         onImprimir={() => void imprimir()}
       />

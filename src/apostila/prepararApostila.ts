@@ -72,6 +72,27 @@ function distribuirPerguntas(doc: Document) {
   }
 }
 
+const LARGURA_MINIMA_FIGURA = 200;
+
+function larguraDeclarada(midia: Element): number | null {
+  const caixa = (midia.getAttribute("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
+  if (caixa.length === 4 && caixa[2] > 0) return caixa[2];
+  const largura = parseFloat(midia.getAttribute("width") ?? "");
+  return Number.isFinite(largura) && largura > 0 ? largura : null;
+}
+
+function marcarFiguras(doc: Document) {
+  for (const midia of Array.from(doc.body.querySelectorAll("svg, img"))) {
+    if (midia.parentElement?.closest("svg") || midia.closest(".cover, a, .f.qa")) continue;
+    const largura = larguraDeclarada(midia);
+    if (largura !== null && largura < LARGURA_MINIMA_FIGURA) continue;
+    const figura = midia.closest("figure, .fig, .figbox") ?? midia;
+    if (figura.classList.contains("ap-figura")) continue;
+    figura.classList.add("ap-figura");
+    figura.setAttribute("tabindex", "0");
+  }
+}
+
 function textoDoTitulo(el: Element): string {
   const copia = el.cloneNode(true) as Element;
   copia.querySelectorAll(".ref").forEach((r) => r.remove());
@@ -132,6 +153,7 @@ export function prepararApostila(html: string): ApostilaPreparada {
   limpar(doc);
 
   distribuirPerguntas(doc);
+  marcarFiguras(doc);
 
   for (const tabela of Array.from(doc.body.querySelectorAll("table"))) {
     const caixa = doc.createElement("div");

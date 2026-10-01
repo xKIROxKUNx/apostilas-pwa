@@ -184,6 +184,27 @@
 
 .ap-raiz .f.qa[aria-expanded="true"] { border-left-color: var(--gold, #c1892f); }
 
+.ap-raiz .ap-figura {
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ap-raiz .ap-figura:focus-visible { outline: 2px solid var(--gold, #c1892f); outline-offset: 2px; }
+
+.ap-raiz .ap-figura::after {
+  content: "Toque para ampliar";
+  display: block;
+  margin-top: 1mm;
+  font-size: 0.85em;
+  font-style: italic;
+  text-align: right;
+  color: var(--grey, #5b6570);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ap-raiz .ap-figura::after { content: "Clique para ampliar"; }
+}
+
 ::highlight(ap-busca) {
   background-color: rgb(255 214 0 / 0.45);
   color: inherit;
@@ -297,3 +318,4 @@
 
 .ap-raiz[data-tema="escuro"] .figbox figcaption { color: #5b6570; }
 .ap-raiz[data-tema="escuro"] .figbox .fig-num { color: #16324a; }
+.ap-raiz[data-tema="escuro"] .figbox.ap-figura::after { color: #5b6570; }

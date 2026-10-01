@@ -4,6 +4,7 @@ import cssConteudo from "./conteudo.css?inline";
 import { prepararApostila } from "./prepararApostila";
 import { buscar, criarIndice, destacar, limparDestaque, type IndiceTexto, type Ocorrencia } from "./buscaApostila";
 import BarraRolagem, { type MarcoRolagem } from "./BarraRolagem";
+import FiguraAmpliada from "./FiguraAmpliada";
 import { useBarraRecolhivel } from "./telaCheia";
 import { AjusteTexto, ResultadosBusca, SumarioApostila } from "./folhas";
 import { useTheme } from "@/state/ThemeContext";
@@ -80,6 +81,7 @@ interface LeitorApostilaProps {
   html: string;
   escopoArmazenamento: string;
   imersivo: boolean;
+  marcaDagua?: string;
   onSair: () => void;
   onImprimir: () => void;
 }
@@ -89,6 +91,7 @@ export default function LeitorApostila({
   html,
   escopoArmazenamento,
   imersivo,
+  marcaDagua,
   onSair,
   onImprimir,
 }: LeitorApostilaProps) {
@@ -119,6 +122,8 @@ export default function LeitorApostila({
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [atual, setAtual] = useState(-1);
   const [procurando, setProcurando] = useState(false);
+  const [figura, setFigura] = useState<Element | null>(null);
+  const fecharFigura = useCallback(() => setFigura(null), []);
 
   const barraOculta = useBarraRecolhivel(rolagemRef, imersivo && !buscando);
   const zoom = (zoomBase ?? 1) * escala;
@@ -322,12 +327,21 @@ export default function LeitorApostila({
         irParaId(decodeURIComponent((link.getAttribute("href") ?? "").slice(1)));
         return;
       }
+      const ampliavel = alvo?.closest(".ap-figura");
+      if (ampliavel) {
+        setFigura(ampliavel);
+        return;
+      }
       const cartao = alvo?.closest(".f.qa");
       if (cartao) alternar(cartao);
     }
     function onTecla(e: KeyboardEvent) {
       const alvo = e.target instanceof Element ? e.target : null;
-      if (alvo?.matches(".f.qa") && (e.key === "Enter" || e.key === " ")) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (alvo?.matches(".ap-figura")) {
+        e.preventDefault();
+        setFigura(alvo);
+      } else if (alvo?.matches(".f.qa")) {
         e.preventDefault();
         alternar(alvo);
       }
@@ -534,6 +548,8 @@ export default function LeitorApostila({
           </div>
         )}
       </div>
+
+      {figura && <FiguraAmpliada origem={figura} marcaDagua={marcaDagua} onFechar={fecharFigura} />}
 
       {folha === "sumario" && (
         <SumarioApostila
