@@ -1,3 +1,5 @@
+type Modo = "tela" | "impressao";
+
 function fechamento(css: string, abre: number): number {
   let profundidade = 0;
   for (let i = abre; i < css.length; i++) {
@@ -20,7 +22,7 @@ function mapearSeletor(seletor: string): string {
     .join(", ");
 }
 
-function processar(css: string): string {
+function processar(css: string, modo: Modo, paginas: string[]): string {
   let saida = "";
   let i = 0;
   while (i < css.length) {
@@ -35,9 +37,14 @@ function processar(css: string): string {
     if (!cabecalho) continue;
     if (cabecalho.startsWith("@")) {
       const regra = cabecalho.toLowerCase();
-      if (regra.startsWith("@page") || regra.startsWith("@font-face") || /^@media\s+print\b/.test(regra)) continue;
+      if (regra.startsWith("@font-face")) continue;
+      if (regra.startsWith("@page")) {
+        if (modo === "impressao") paginas.push(`${cabecalho}{${corpo}}`);
+        continue;
+      }
+      if (modo === "tela" && /^@media\s+print\b/.test(regra)) continue;
       if (regra.startsWith("@media") || regra.startsWith("@supports") || regra.startsWith("@container")) {
-        saida += `${cabecalho}{${processar(corpo)}}\n`;
+        saida += `${cabecalho}{${processar(corpo, modo, paginas)}}\n`;
       } else {
         saida += `${cabecalho}{${corpo}}\n`;
       }
@@ -48,6 +55,16 @@ function processar(css: string): string {
   return saida;
 }
 
+function semComentarios(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 export function transformarCss(css: string): string {
-  return processar(css.replace(/\/\*[\s\S]*?\*\//g, ""));
+  return processar(semComentarios(css), "tela", []);
+}
+
+export function transformarCssImpressao(css: string): { conteudo: string; paginas: string } {
+  const paginas: string[] = [];
+  const conteudo = processar(semComentarios(css), "impressao", paginas);
+  return { conteudo, paginas: paginas.join("\n") };
 }

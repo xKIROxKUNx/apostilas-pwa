@@ -15,6 +15,7 @@ import {
   FormatSize,
   KeyboardArrowDown,
   KeyboardArrowUp,
+  Print,
   Search,
   Toc,
 } from "@/components/icons";
@@ -74,9 +75,10 @@ interface LeitorApostilaProps {
   html: string;
   escopoArmazenamento: string;
   onSair: () => void;
+  onImprimir: () => void;
 }
 
-export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSair }: LeitorApostilaProps) {
+export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSair, onImprimir }: LeitorApostilaProps) {
   const preparado = useMemo(() => prepararApostila(html), [html]);
   const { resolved } = useTheme();
 
@@ -461,6 +463,9 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
             </span>
             <IconButton label="Tamanho do texto" onClick={() => setFolha("texto")}>
               <FormatSize />
+            </IconButton>
+            <IconButton label="Imprimir" onClick={onImprimir}>
+              <Print />
             </IconButton>
             <IconButton label="Buscar" onClick={() => setBuscando(true)}>
               <Search />

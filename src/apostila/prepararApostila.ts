@@ -1,4 +1,4 @@
-import { transformarCss } from "./transformarCss";
+import { transformarCss, transformarCssImpressao } from "./transformarCss";
 
 export interface TituloApostila {
   id: string;
@@ -78,10 +78,11 @@ function textoDoTitulo(el: Element): string {
   return (copia.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
-export function prepararApostila(html: string): ApostilaPreparada {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const css = transformarCss(Array.from(doc.querySelectorAll("style"), (s) => s.textContent ?? "").join("\n"));
+function cssDoDocumento(doc: Document): string {
+  return Array.from(doc.querySelectorAll("style"), (s) => s.textContent ?? "").join("\n");
+}
 
+function limpar(doc: Document) {
   doc.querySelectorAll(BLOQUEADOS).forEach((el) => el.remove());
 
   for (const el of Array.from(doc.body.querySelectorAll("*"))) {
@@ -102,6 +103,33 @@ export function prepararApostila(html: string): ApostilaPreparada {
       a.removeAttribute("href");
     }
   }
+}
+
+function raizDe(doc: Document): HTMLDivElement {
+  const raiz = document.createElement("div");
+  raiz.className = "ap-raiz";
+  for (const classe of Array.from(doc.body.classList)) raiz.classList.add(classe);
+  raiz.append(...Array.from(doc.body.childNodes));
+  return raiz;
+}
+
+export interface ImpressaoPreparada {
+  css: string;
+  paginas: string;
+  raiz: HTMLDivElement;
+}
+
+export function prepararImpressao(html: string): ImpressaoPreparada {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const { conteudo, paginas } = transformarCssImpressao(cssDoDocumento(doc));
+  limpar(doc);
+  return { css: conteudo, paginas, raiz: raizDe(doc) };
+}
+
+export function prepararApostila(html: string): ApostilaPreparada {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const css = transformarCss(cssDoDocumento(doc));
+  limpar(doc);
 
   distribuirPerguntas(doc);
 
@@ -139,10 +167,7 @@ export function prepararApostila(html: string): ApostilaPreparada {
     titulos.push({ id: el.id, titulo, nivel: el.tagName === "H1" ? 0 : 1 });
   });
 
-  const raiz = document.createElement("div");
-  raiz.className = "ap-raiz";
-  for (const classe of Array.from(doc.body.classList)) raiz.classList.add(classe);
-  raiz.append(...Array.from(doc.body.childNodes));
+  const raiz = raizDe(doc);
 
   const ancoras = Array.from(raiz.querySelectorAll(":scope > * > *:not(.ap-dica-tabela)"));
   return { css, raiz, titulos, ancoras: ancoras.length > 0 ? ancoras : Array.from(raiz.children) };

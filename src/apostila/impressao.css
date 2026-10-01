@@ -1,0 +1,105 @@
+.ap-creditos {
+  page: ap-creditos;
+  break-before: page;
+  break-after: page;
+  box-sizing: border-box;
+  min-height: 200mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0 18mm;
+  text-align: center;
+  font-family: "Poppins", "Liberation Sans", sans-serif;
+  color: #2b2f36;
+  background: transparent;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.ap-creditos * { margin: 0; }
+
+.ap-creditos p { text-align: center; }
+
+.ap-creditos__selo {
+  margin-bottom: 7mm;
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #6b7480;
+}
+
+.ap-creditos__titulo {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 17pt;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #1f2933;
+}
+
+.ap-creditos__componente {
+  margin-top: 2mm;
+  font-size: 10.5pt;
+  color: #4b5563;
+}
+
+.ap-creditos__assinante {
+  margin-top: 12mm;
+  padding: 4mm 8mm;
+  border: 0.6pt solid #c9ced6;
+  border-radius: 3mm;
+  font-size: 9.5pt;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.ap-creditos__aviso {
+  max-width: 135mm;
+  margin-top: 12mm;
+  font-family: "Lora", "Liberation Serif", serif;
+  font-size: 9.5pt;
+  line-height: 1.6;
+  text-align: justify;
+  color: #374151;
+}
+
+.ap-creditos__aviso p { text-align: justify; }
+.ap-creditos__aviso p + p { margin-top: 3mm; }
+
+.ap-creditos strong { color: #111827; }
+
+.ap-creditos__rodape {
+  margin-top: 12mm;
+  font-size: 8pt;
+  line-height: 1.7;
+  letter-spacing: 0.5px;
+  color: #6b7480;
+}
+
+.ap-raiz[data-motor="webkit"] .cover {
+  width: auto;
+  height: auto;
+}
+
+.ap-raiz[data-motor="webkit"] .cover .content {
+  position: relative;
+  inset: auto;
+  padding: 12mm 14mm;
+}
+
+.ap-raiz[data-motor="webkit"] .cover .corner { display: none; }
+
+.ap-raiz[data-motor="webkit"] .cover .eyebrow,
+.ap-raiz[data-motor="webkit"] .cover .subtitle,
+.ap-raiz[data-motor="webkit"] .cover .chip-unit,
+.ap-raiz[data-motor="webkit"] .cover .unit-list { margin-bottom: 6mm; }
+
+.ap-raiz[data-motor="webkit"] .ap-creditos {
+  min-height: 0;
+  padding-top: 30mm;
+}

@@ -25,6 +25,7 @@ import { CamadaPrivacidade, MensagemConteudo, useAcessoConteudo, useProtecaoCont
 import { downloadApostilaHtml } from "@/firebase/apostilaHtmlService";
 import { isStorageDenied, toFriendlyMessage } from "@/firebase/errorMessages";
 import LeitorApostila from "@/apostila/LeitorApostila";
+import ImpressaoApostila from "@/apostila/ImpressaoApostila";
 import { rotaDoConteudo } from "@/types/domain";
 
 export default function LeituraScreen() {
@@ -40,6 +41,26 @@ export default function LeituraScreen() {
   const [html, setHtml] = useState<string | null>(null);
   const [erro, setErro] = useState<Error | null>(null);
   const [negadoPeloServidor, setNegadoPeloServidor] = useState(false);
+  const [imprimindo, setImprimindo] = useState(false);
+
+  useEffect(() => {
+    const iniciar = () => setImprimindo(true);
+    const terminar = () => setImprimindo(false);
+    window.addEventListener("beforeprint", iniciar);
+    window.addEventListener("afterprint", terminar);
+    window.addEventListener("focus", terminar);
+    return () => {
+      window.removeEventListener("beforeprint", iniciar);
+      window.removeEventListener("afterprint", terminar);
+      window.removeEventListener("focus", terminar);
+    };
+  }, []);
+
+  const imprimir = async () => {
+    setImprimindo(true);
+    await Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 3000))]);
+    window.print();
+  };
 
   useEffect(() => {
     if (!apostila || apostila.tipo !== "html" || accessState !== "allowed") return;
@@ -102,13 +123,20 @@ export default function LeituraScreen() {
         html={html}
         escopoArmazenamento={`${user?.uid ?? "anon"}:${apostila.id}`}
         onSair={voltar}
+        onImprimir={() => void imprimir()}
+      />
+      <ImpressaoApostila
+        html={html}
+        titulo={apostila.titulo}
+        componente={apostila.componenteCurricular}
+        email={user?.email ?? ""}
       />
       {user?.email && (
         <div className="ap-marca-dagua" aria-hidden>
           {user.email}
         </div>
       )}
-      {oculto && <CamadaPrivacidade />}
+      {oculto && !imprimindo && <CamadaPrivacidade />}
     </>
   );
 }
