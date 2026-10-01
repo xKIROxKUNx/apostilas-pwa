@@ -26,6 +26,7 @@ import { downloadApostilaHtml } from "@/firebase/apostilaHtmlService";
 import { isStorageDenied, toFriendlyMessage } from "@/firebase/errorMessages";
 import LeitorApostila from "@/apostila/LeitorApostila";
 import ImpressaoApostila from "@/apostila/ImpressaoApostila";
+import { useTelaCheiaNaPaisagem } from "@/apostila/telaCheia";
 import { rotaDoConteudo } from "@/types/domain";
 
 export default function LeituraScreen() {
@@ -83,6 +84,7 @@ export default function LeituraScreen() {
   }, [apostila, accessState]);
 
   const voltar = () => navigate("/home");
+  const imersivo = useTelaCheiaNaPaisagem(voltar);
 
   if (apostila && apostila.tipo !== "html") {
     return <Navigate to={rotaDoConteudo(apostila)} replace />;
@@ -122,6 +124,7 @@ export default function LeituraScreen() {
         titulo={apostila.titulo}
         html={html}
         escopoArmazenamento={`${user?.uid ?? "anon"}:${apostila.id}`}
+        imersivo={imersivo}
         onSair={voltar}
         onImprimir={() => void imprimir()}
       />

@@ -4,6 +4,7 @@ import cssConteudo from "./conteudo.css?inline";
 import { prepararApostila } from "./prepararApostila";
 import { buscar, criarIndice, destacar, limparDestaque, type IndiceTexto, type Ocorrencia } from "./buscaApostila";
 import BarraRolagem, { type MarcoRolagem } from "./BarraRolagem";
+import { useBarraRecolhivel } from "./telaCheia";
 import { AjusteTexto, ResultadosBusca, SumarioApostila } from "./folhas";
 import { useTheme } from "@/state/ThemeContext";
 import { getReadingPosition, saveReadingPosition } from "@/state/localPrefs";
@@ -53,6 +54,10 @@ function ajustarTitulosCapa(raiz: HTMLElement) {
   }
 }
 
+function topoLeitura(r: HTMLElement): number {
+  return r.getBoundingClientRect().top + (parseFloat(getComputedStyle(r).paddingTop) || 0);
+}
+
 function lerEscala(): number {
   try {
     const valor = Number(localStorage.getItem(CHAVE_ESCALA));
@@ -74,14 +79,24 @@ interface LeitorApostilaProps {
   titulo: string;
   html: string;
   escopoArmazenamento: string;
+  imersivo: boolean;
   onSair: () => void;
   onImprimir: () => void;
 }
 
-export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSair, onImprimir }: LeitorApostilaProps) {
+export default function LeitorApostila({
+  titulo,
+  html,
+  escopoArmazenamento,
+  imersivo,
+  onSair,
+  onImprimir,
+}: LeitorApostilaProps) {
   const preparado = useMemo(() => prepararApostila(html), [html]);
   const { resolved } = useTheme();
 
+  const paginaRef = useRef<HTMLDivElement>(null);
+  const topoRef = useRef<HTMLDivElement>(null);
   const rolagemRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const buscaRef = useRef<HTMLInputElement>(null);
@@ -105,6 +120,7 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
   const [atual, setAtual] = useState(-1);
   const [procurando, setProcurando] = useState(false);
 
+  const barraOculta = useBarraRecolhivel(rolagemRef, imersivo && !buscando);
   const zoom = (zoomBase ?? 1) * escala;
   const escopoPosicao = `html:${escopoArmazenamento}`;
 
@@ -112,7 +128,7 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
     const r = rolagemRef.current;
     const ancoras = preparado.ancoras;
     if (!r || ancoras.length === 0) return null;
-    const limite = r.getBoundingClientRect().top + 1;
+    const limite = topoLeitura(r) + 1;
     let baixo = 0;
     let alto = ancoras.length - 1;
     let melhor = 0;
@@ -136,7 +152,7 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
       const el = preparado.ancoras[posicao.indice];
       if (!r || !el) return;
       const rect = el.getBoundingClientRect();
-      r.scrollTop += rect.top - r.getBoundingClientRect().top + posicao.fracao * rect.height;
+      r.scrollTop += rect.top - topoLeitura(r) + posicao.fracao * rect.height;
     },
     [preparado],
   );
@@ -164,7 +180,7 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
   const irParaElemento = useCallback((el: Element | null) => {
     const r = rolagemRef.current;
     if (!r || !el) return;
-    r.scrollTop += el.getBoundingClientRect().top - r.getBoundingClientRect().top - MARGEM_TITULO_PX;
+    r.scrollTop += el.getBoundingClientRect().top - topoLeitura(r) - MARGEM_TITULO_PX;
   }, []);
 
   const irParaId = useCallback(
@@ -216,6 +232,15 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
       setLarguraRolagem(r.clientWidth);
     });
     observador.observe(r);
+    return () => observador.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    const topo = topoRef.current;
+    const pagina = paginaRef.current;
+    if (!topo || !pagina) return;
+    const observador = new ResizeObserver(() => pagina.style.setProperty("--ap-reserva", `${topo.offsetHeight}px`));
+    observador.observe(topo);
     return () => observador.disconnect();
   }, []);
 
@@ -409,76 +434,78 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
     .map((t) => ({ titulo: t.titulo, fracao: Math.min(t.topo / medidas.faixa, 1) }));
 
   return (
-    <div className="ap-pagina">
-      <TopAppBar>
-        {buscando ? (
-          <>
-            <IconButton label="Fechar busca" onClick={fecharBusca}>
-              <Close />
-            </IconButton>
-            <input
-              ref={buscaRef}
-              value={consulta}
-              onChange={(e) => setConsulta(e.target.value)}
-              placeholder="Buscar na apostila…"
-              className="m3-body-large ap-busca"
-              aria-label="Buscar na apostila"
-              enterKeyHint="search"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") moverOcorrencia(e.shiftKey ? -1 : 1);
-              }}
-            />
-            <span className="m3-label-large ap-contador">
-              {procurando ? (
-                <Spinner size={18} />
-              ) : ocorrencias.length > 0 ? (
-                `${atual + 1}/${ocorrencias.length}`
-              ) : consulta.trim().length >= 2 ? (
-                "0"
-              ) : (
-                ""
+    <div ref={paginaRef} className={`ap-pagina${imersivo ? " ap-pagina--imersiva" : ""}`}>
+      <div ref={topoRef} className={`ap-topo${barraOculta ? " ap-topo--oculto" : ""}`}>
+        <TopAppBar>
+          {buscando ? (
+            <>
+              <IconButton label="Fechar busca" onClick={fecharBusca}>
+                <Close />
+              </IconButton>
+              <input
+                ref={buscaRef}
+                value={consulta}
+                onChange={(e) => setConsulta(e.target.value)}
+                placeholder="Buscar na apostila…"
+                className="m3-body-large ap-busca"
+                aria-label="Buscar na apostila"
+                enterKeyHint="search"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") moverOcorrencia(e.shiftKey ? -1 : 1);
+                }}
+              />
+              <span className="m3-label-large ap-contador">
+                {procurando ? (
+                  <Spinner size={18} />
+                ) : ocorrencias.length > 0 ? (
+                  `${atual + 1}/${ocorrencias.length}`
+                ) : consulta.trim().length >= 2 ? (
+                  "0"
+                ) : (
+                  ""
+                )}
+              </span>
+              {ocorrencias.length > 0 && (
+                <>
+                  <IconButton label="Ocorrência anterior" onClick={() => moverOcorrencia(-1)}>
+                    <KeyboardArrowUp />
+                  </IconButton>
+                  <IconButton label="Próxima ocorrência" onClick={() => moverOcorrencia(1)}>
+                    <KeyboardArrowDown />
+                  </IconButton>
+                  <IconButton label="Todos os resultados" onClick={() => setFolha("resultados")}>
+                    <FormatListBulleted />
+                  </IconButton>
+                </>
               )}
-            </span>
-            {ocorrencias.length > 0 && (
-              <>
-                <IconButton label="Ocorrência anterior" onClick={() => moverOcorrencia(-1)}>
-                  <KeyboardArrowUp />
-                </IconButton>
-                <IconButton label="Próxima ocorrência" onClick={() => moverOcorrencia(1)}>
-                  <KeyboardArrowDown />
-                </IconButton>
-                <IconButton label="Todos os resultados" onClick={() => setFolha("resultados")}>
-                  <FormatListBulleted />
-                </IconButton>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <IconButton label="Voltar" onClick={onSair}>
-              <ArrowBack />
-            </IconButton>
-            <span className="m3-title-medium m3-appbar__title" style={{ color: "var(--md-on-surface-variant)" }}>
-              {capituloAtual ?? titulo}
-            </span>
-            <IconButton label="Tamanho do texto" onClick={() => setFolha("texto")}>
-              <FormatSize />
-            </IconButton>
-            <IconButton label="Imprimir" onClick={onImprimir}>
-              <Print />
-            </IconButton>
-            <IconButton label="Buscar" onClick={() => setBuscando(true)}>
-              <Search />
-            </IconButton>
-            <IconButton label="Sumário" onClick={() => setFolha("sumario")}>
-              <Toc />
-            </IconButton>
-          </>
-        )}
-      </TopAppBar>
+            </>
+          ) : (
+            <>
+              <IconButton label="Voltar" onClick={onSair}>
+                <ArrowBack />
+              </IconButton>
+              <span className="m3-title-medium m3-appbar__title" style={{ color: "var(--md-on-surface-variant)" }}>
+                {capituloAtual ?? titulo}
+              </span>
+              <IconButton label="Tamanho do texto" onClick={() => setFolha("texto")}>
+                <FormatSize />
+              </IconButton>
+              <IconButton label="Imprimir" onClick={onImprimir}>
+                <Print />
+              </IconButton>
+              <IconButton label="Buscar" onClick={() => setBuscando(true)}>
+                <Search />
+              </IconButton>
+              <IconButton label="Sumário" onClick={() => setFolha("sumario")}>
+                <Toc />
+              </IconButton>
+            </>
+          )}
+        </TopAppBar>
 
-      <div className="ap-progresso" role="progressbar" aria-label="Progresso da leitura" aria-valuenow={Math.round(rolagem.fracao * 100)}>
-        <span style={{ width: `${rolagem.fracao * 100}%` }} />
+        <div className="ap-progresso" role="progressbar" aria-label="Progresso da leitura" aria-valuenow={Math.round(rolagem.fracao * 100)}>
+          <span style={{ width: `${rolagem.fracao * 100}%` }} />
+        </div>
       </div>
 
       <div className="ap-corpo">
@@ -495,14 +522,16 @@ export default function LeitorApostila({ titulo, html, escopoArmazenamento, onSa
           </div>
         )}
         {pronto && (
-          <BarraRolagem
-            fracao={rolagem.fracao}
-            marcos={marcos}
-            onFracao={(f) => {
-              const r = rolagemRef.current;
-              if (r) r.scrollTop = f * (r.scrollHeight - r.clientHeight);
-            }}
-          />
+          <div className="ap-trilho">
+            <BarraRolagem
+              fracao={rolagem.fracao}
+              marcos={marcos}
+              onFracao={(f) => {
+                const r = rolagemRef.current;
+                if (r) r.scrollTop = f * (r.scrollHeight - r.clientHeight);
+              }}
+            />
+          </div>
         )}
       </div>
 
