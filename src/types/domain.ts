@@ -15,6 +15,7 @@ export interface Apostila {
   nivelRequerido: number;
   tipo: TipoConteudo;
   urlConteudo: string;
+  unidade: number | null;
 }
 
 const ROTAS_CONTEUDO: Record<TipoConteudo, string> = {

@@ -115,14 +115,10 @@ interface BottomSheetProps {
   children: React.ReactNode;
 }
 
-export function BottomSheet({ title, onClose, children }: BottomSheetProps) {
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const grabRef = useRef<HTMLDivElement>(null);
-
+export function useFocoModal(ref: React.RefObject<HTMLElement | null>, onClose: () => void) {
   useEffect(() => {
     const anterior = document.activeElement as HTMLElement | null;
-    sheetRef.current?.focus();
+    ref.current?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -131,7 +127,7 @@ export function BottomSheet({ title, onClose, children }: BottomSheetProps) {
         return;
       }
       if (e.key !== "Tab") return;
-      const alvos = sheetRef.current?.querySelectorAll<HTMLElement>(
+      const alvos = ref.current?.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       if (!alvos || alvos.length === 0) return;
@@ -151,7 +147,15 @@ export function BottomSheet({ title, onClose, children }: BottomSheetProps) {
       document.removeEventListener("keydown", onKeyDown, true);
       anterior?.focus?.();
     };
-  }, [onClose]);
+  }, [ref, onClose]);
+}
+
+export function BottomSheet({ title, onClose, children }: BottomSheetProps) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const grabRef = useRef<HTMLDivElement>(null);
+
+  useFocoModal(sheetRef, onClose);
 
   useLayoutEffect(() => {
     const body = bodyRef.current;

@@ -14,6 +14,7 @@ export async function getApostilas(): Promise<Apostila[]> {
       nivelRequerido: typeof data.nivel_requerido === "number" ? data.nivel_requerido : 1,
       tipo: data.tipo === "simulado" || data.tipo === "html" ? data.tipo : "pdf",
       urlConteudo: data.url_conteudo ?? "",
+      unidade: typeof data.unidade === "number" ? data.unidade : null,
     } satisfies Apostila;
   });
 }

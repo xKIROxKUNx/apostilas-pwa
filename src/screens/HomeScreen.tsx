@@ -8,16 +8,18 @@ import { hasAccess, rotaDoConteudo, toRoleName, type Apostila, type TipoConteudo
 import { canOpenApostilaAnyDevice } from "@/security/wasm/accessGuard";
 import { getOrCreateDeviceId } from "@/security/deviceId";
 import { toFriendlyMessage } from "@/firebase/errorMessages";
+import { useUnidade } from "@/state/unidade";
 import { Button, Card, IconButton, Snackbar, Spinner } from "@/components";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { RefreshButton } from "@/components/RefreshButton";
 import { AvisoDeAtualizacao } from "@/components/AvisoDeAtualizacao";
+import { MenuLateral } from "@/components/MenuLateral";
+import { SeletorUnidade } from "@/components/SeletorUnidade";
 import {
+  Bolt,
   ExpandLess,
   ExpandMore,
   KeyboardArrowRight,
   Lock,
-  Logout,
+  Menu,
   MenuBook,
   Quiz,
 } from "@/components/icons";
@@ -26,6 +28,29 @@ const ROTULO_TIPO: Partial<Record<TipoConteudo, string>> = {
   simulado: "Simulado interativo",
   html: "Apostila dinâmica",
 };
+
+type Categoria = "completa" | "rapida" | "simulado";
+
+const ORDEM_CATEGORIA: Record<Categoria, number> = { completa: 0, rapida: 1, simulado: 2 };
+
+function semAcento(texto: string): string {
+  return texto.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+function categoriaDe(apostila: Apostila): Categoria {
+  const titulo = semAcento(apostila.titulo);
+  if (apostila.tipo === "simulado" || titulo.startsWith("simulado")) return "simulado";
+  if (titulo.includes("revisao rapida")) return "rapida";
+  return "completa";
+}
+
+function ordenar(lista: Apostila[]): Apostila[] {
+  return [...lista].sort(
+    (a, b) =>
+      ORDEM_CATEGORIA[categoriaDe(a)] - ORDEM_CATEGORIA[categoriaDe(b)] ||
+      a.titulo.localeCompare(b.titulo, "pt-BR", { numeric: true, sensitivity: "base" }),
+  );
+}
 
 const CORES_MATERIA = [
   "var(--md-materia1)",
@@ -41,16 +66,21 @@ export default function HomeScreen() {
   const { diasRestantes } = useSubscription();
   const navigate = useNavigate();
   const [toast, setToast] = useState<string | null>(null);
+  const [menuAberto, setMenuAberto] = useState(false);
+  const { unidades, selecionada, selecionar } = useUnidade(apostilas, user?.uid ?? "anon");
 
   const grouped = useMemo(() => {
     const map = new Map<string, Apostila[]>();
     for (const a of apostilas) {
+      if (selecionada !== null && a.unidade !== null && a.unidade !== selecionada) continue;
       const list = map.get(a.componenteCurricular) ?? [];
       list.push(a);
       map.set(a.componenteCurricular, list);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [apostilas]);
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([componente, lista]) => [componente, ordenar(lista)] as const);
+  }, [apostilas, selecionada]);
 
   const userLevel = userProfile?.nivelAcesso ?? 0;
   const displayName = savedNickname || user?.email || "Estudante";
@@ -81,15 +111,18 @@ export default function HomeScreen() {
     <div style={styles.page}>
       <AvisoDeAtualizacao />
       <header style={styles.header}>
-        <h1 className="m3-headline-small">Apostilas</h1>
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <RefreshButton />
-          <ThemeToggle />
-          <IconButton label="Sair" onClick={logout}>
-            <Logout />
-          </IconButton>
-        </div>
+        <IconButton label="Abrir menu" aria-haspopup="dialog" onClick={() => setMenuAberto(true)} style={styles.botaoMenu}>
+          <Menu />
+        </IconButton>
+        <h1 className="m3-headline-small" style={styles.titulo}>
+          Apostilas
+        </h1>
+        {selecionada !== null && (
+          <SeletorUnidade unidades={unidades} selecionada={selecionada} onSelecionar={selecionar} />
+        )}
       </header>
+
+      {menuAberto && <MenuLateral nome={displayName} onFechar={() => setMenuAberto(false)} onSair={logout} />}
 
       <Card variant="primary" radius="xl" style={styles.welcome}>
         <p className="m3-headline-small">Olá, {displayName}</p>
@@ -140,7 +173,9 @@ export default function HomeScreen() {
       {!loading && !error && userLevel > 0 && grouped.length === 0 && (
         <div style={styles.centerMsg}>
           <p className="m3-body-medium" style={{ color: "var(--md-on-surface-variant)" }}>
-            Nenhuma apostila disponível no momento.
+            {apostilas.length > 0 && selecionada !== null
+              ? `Ainda não há apostilas da Unidade ${selecionada}.`
+              : "Nenhuma apostila disponível no momento."}
           </p>
         </div>
       )}
@@ -174,7 +209,7 @@ function SubjectFolder({
   onOpen,
 }: {
   title: string;
-  apostilas: Apostila[];
+  apostilas: readonly Apostila[];
   userLevel: number;
   color: string;
   onOpen: (a: Apostila) => void;
@@ -239,6 +274,8 @@ function SubjectFolder({
                       <Lock size={20} />
                     ) : a.tipo === "simulado" ? (
                       <Quiz size={20} />
+                    ) : categoriaDe(a) === "rapida" ? (
+                      <Bolt size={20} />
                     ) : a.tipo === "html" ? (
                       <MenuBook size={20} />
                     ) : (
@@ -266,9 +303,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   header: {
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 4,
   },
+  botaoMenu: { marginLeft: -12 },
+  titulo: { flex: 1, minWidth: 0 },
   welcome: { padding: 20 },
   assinatura: { margin: "8px 0 0" },
   alerta: { margin: "8px 0 0", color: "var(--md-error)" },

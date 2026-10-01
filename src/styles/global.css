@@ -116,6 +116,11 @@ a {
   to { transform: translateY(0); }
 }
 
+@keyframes m3-slide-right {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
