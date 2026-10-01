@@ -4,13 +4,22 @@ import { VitePWA } from "vite-plugin-pwa";
 
 const GITHUB_PAGES_BASE = "/apostilas-pwa/";
 const resolvedBase = process.env.VITE_BASE_PATH ?? GITHUB_PAGES_BASE;
+const versao = process.env.VITE_APP_VERSION ?? "dev";
 
 export default defineConfig({
   base: resolvedBase,
   plugins: [
     react(),
+    {
+      name: "versao",
+      apply: "build",
+      generateBundle() {
+        this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ versao }) });
+      },
+    },
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["icons/*.png", "wasm/*.wasm"],
       manifest: {
         id: resolvedBase,

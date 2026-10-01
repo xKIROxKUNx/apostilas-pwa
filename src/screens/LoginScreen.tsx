@@ -5,6 +5,7 @@ import { toFriendlyMessage } from "@/firebase/errorMessages";
 import { Button, Card, IconButton, Spinner, TextField } from "@/components";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { RefreshButton } from "@/components/RefreshButton";
+import { AvisoDeAtualizacao } from "@/components/AvisoDeAtualizacao";
 import { Visibility, VisibilityOff } from "@/components/icons";
 
 export default function LoginScreen() {
@@ -62,6 +63,7 @@ export default function LoginScreen() {
 
   return (
     <div style={styles.page}>
+      <AvisoDeAtualizacao />
       <div style={styles.themeCorner}>
         <RefreshButton />
         <ThemeToggle />

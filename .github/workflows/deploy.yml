@@ -17,9 +17,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      versao: ${{ steps.versao.outputs.versao }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configurar Node
         uses: actions/setup-node@v4
@@ -30,9 +34,14 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Versão
+        id: versao
+        run: node scripts/versao.mjs
+
       - name: Build (inclui compilação do WASM de segurança)
         run: npm run build
         env:
+          VITE_APP_VERSION: ${{ steps.versao.outputs.versao }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -49,6 +58,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -56,3 +69,8 @@ jobs:
       - name: Deploy no GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Marcar a versão publicada
+        run: gh api "repos/${{ github.repository }}/git/refs" -f ref="refs/tags/v${{ needs.build.outputs.versao }}" -f sha="${{ github.sha }}"
+        env:
+          GH_TOKEN: ${{ github.token }}

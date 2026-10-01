@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef } from "react";
+import { Component, Suspense, lazy, useEffect, useRef, type ReactNode } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import SplashScreen from "@/screens/SplashScreen";
 import LoginScreen from "@/screens/LoginScreen";
@@ -10,14 +10,17 @@ import { AuthProvider, useAuth } from "@/state/AuthContext";
 import { ThemeProvider } from "@/state/ThemeContext";
 import { ApostilasProvider, useApostilas } from "@/state/ApostilasContext";
 import { useSubscription } from "@/state/useSubscription";
+import { carregarComRecuperacao, useEstadoAtualizacao } from "@/state/atualizacao";
+import { TelaCarregando } from "@/components/TelaCarregando";
+import { Button } from "@/components";
 
-const PdfReaderScreen = lazy(() => import("@/screens/PdfReaderScreen"));
-const SimuladoScreen = lazy(() => import("@/screens/SimuladoScreen"));
-const LeituraScreen = lazy(() => import("@/screens/LeituraScreen"));
+const PdfReaderScreen = lazy(carregarComRecuperacao(() => import("@/screens/PdfReaderScreen")));
+const SimuladoScreen = lazy(carregarComRecuperacao(() => import("@/screens/SimuladoScreen")));
+const LeituraScreen = lazy(carregarComRecuperacao(() => import("@/screens/LeituraScreen")));
 
 function RequireSession({ children }: { children: React.ReactNode }) {
   const { sessionState } = useAuth();
-  if (sessionState === "checking") return null;
+  if (sessionState === "checking") return <TelaCarregando texto="Carregando…" />;
   if (sessionState !== "valid") return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -102,20 +105,30 @@ function AppRoutes() {
 }
 
 function RouteFallback() {
-  return (
-    <div
-      style={{
-        height: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--md-surface)",
-        color: "var(--md-on-surface-variant)",
-      }}
-    >
-      Carregando…
-    </div>
-  );
+  return <TelaCarregando texto="Carregando…" />;
+}
+
+function SobreposicaoDeAtualizacao() {
+  return useEstadoAtualizacao() === "atualizando" ? <TelaCarregando texto="Atualizando…" sobreposta /> : null;
+}
+
+class LimiteDeErro extends Component<{ children: ReactNode }, { erro: boolean }> {
+  state = { erro: false };
+
+  static getDerivedStateFromError() {
+    return { erro: true };
+  }
+
+  render() {
+    if (!this.state.erro) return this.props.children;
+    return (
+      <div className="tela-carregando">
+        <h1 className="m3-headline-medium tela-carregando__titulo">Apostilas</h1>
+        <p className="m3-body-large tela-carregando__texto">Não foi possível carregar esta tela. Verifique sua conexão e tente de novo.</p>
+        <Button onClick={() => location.reload()}>Tentar de novo</Button>
+      </div>
+    );
+  }
 }
 
 export default function App() {
@@ -129,7 +142,10 @@ export default function App() {
       <HashRouter>
         <AuthProvider>
           <ApostilasProvider>
-            <AppRoutes />
+            <LimiteDeErro>
+              <AppRoutes />
+            </LimiteDeErro>
+            <SobreposicaoDeAtualizacao />
           </ApostilasProvider>
         </AuthProvider>
       </HashRouter>

@@ -13,6 +13,9 @@ import "./styles/typography.css";
 import "./styles/motion.css";
 import "./styles/global.css";
 import App from "./App";
+import { registrarServiceWorker } from "./state/atualizacao";
+
+registrarServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

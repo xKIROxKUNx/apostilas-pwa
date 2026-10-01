@@ -32,9 +32,22 @@
 
     <title>Apostilas</title>
     <script src="%BASE_URL%theme-boot.js"></script>
+    <style>
+      body{margin:0}
+      .ci{--ci-fundo:#fefbff;--ci-cor:#2b5bb5;--ci-trilho:#e3e2e6;--ci-texto:#44464f;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px;text-align:center;background:var(--ci-fundo);font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif}
+      @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ci{--ci-fundo:#1b1b1f;--ci-cor:#b0c6ff;--ci-trilho:#343438;--ci-texto:#c5c6d0}}
+      :root[data-theme="dark"] .ci{--ci-fundo:#1b1b1f;--ci-cor:#b0c6ff;--ci-trilho:#343438;--ci-texto:#c5c6d0}
+      .ci h1{margin:0;font-size:1.75rem;line-height:2.25rem;font-weight:400;color:var(--ci-cor)}
+      .ci i{width:28px;height:28px;box-sizing:border-box;border-radius:50%;border:3px solid var(--ci-trilho);border-top-color:var(--ci-cor);animation:ci-gira .8s linear infinite}
+      .ci p{margin:0;font-size:.875rem;line-height:1.25rem;color:var(--ci-texto)}
+      .ci .ci-lento{max-width:280px;opacity:0;animation:ci-surge .3s ease 15s forwards}
+      @keyframes ci-gira{to{transform:rotate(360deg)}}
+      @keyframes ci-surge{to{opacity:1}}
+      @media (prefers-reduced-motion:reduce){.ci i{animation-duration:2.4s}}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="ci" role="status" aria-live="polite"><h1>Apostilas</h1><i></i><p>Carregando…</p><p class="ci-lento">Está demorando mais que o normal. Verifique sua conexão.</p></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

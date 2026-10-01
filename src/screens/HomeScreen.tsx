@@ -11,6 +11,7 @@ import { toFriendlyMessage } from "@/firebase/errorMessages";
 import { Button, Card, IconButton, Snackbar, Spinner } from "@/components";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { RefreshButton } from "@/components/RefreshButton";
+import { AvisoDeAtualizacao } from "@/components/AvisoDeAtualizacao";
 import {
   ExpandLess,
   ExpandMore,
@@ -78,6 +79,7 @@ export default function HomeScreen() {
 
   return (
     <div style={styles.page}>
+      <AvisoDeAtualizacao />
       <header style={styles.header}>
         <h1 className="m3-headline-small">Apostilas</h1>
         <div style={{ display: "flex", alignItems: "center" }}>
